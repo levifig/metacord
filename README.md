@@ -1,4 +1,4 @@
-# Discord Server Manager
+# DSM (Discord Server Manager)
 
 Personal Discord server directory with OAuth authentication.
 

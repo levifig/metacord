@@ -1,4 +1,4 @@
-# Discord Server Manager — Product Requirements Document
+# DSM (Discord Server Manager) — Product Requirements Document
 
 ## Overview
 
