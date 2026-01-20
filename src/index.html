@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Discord Server Manager</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app" id="app">
+      <section class="login-screen" id="login-screen" aria-hidden="false">
+        <div class="login-panel">
+          <div class="login-brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span class="brand-name">Discord Server Manager</span>
+          </div>
+          <h1 class="login-title">Welcome back</h1>
+          <p class="login-copy">No data stored on servers. Everything stays in your device.</p>
+          <div id="login-actions">
+            <a class="btn btn-primary btn-block" href="/api/auth/login">Log in with Discord</a>
+            <a class="login-link" href="https://discord.com/privacy" target="_blank" rel="noopener">
+              Privacy / FAQ
+            </a>
+          </div>
+          <div class="demo-loader hidden" id="demo-loader" aria-live="polite">
+            <h2 class="demo-title">Demo mode</h2>
+            <p class="demo-copy">Load data directly from your device.</p>
+            <label class="btn btn-secondary btn-block">
+              Load guilds_api.json
+              <input class="sr-only" id="demo-file-input" type="file" accept="application/json" />
+            </label>
+            <p class="demo-status muted" id="demo-status" role="status"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="app-shell hidden" id="app-shell" aria-hidden="true">
+        <div class="container">
+          <header class="app-header" data-animate style="--delay: 0ms;">
+            <div class="header-top">
+              <div>
+                <p class="eyebrow">Discord Server Manager</p>
+                <h1>Personal directory</h1>
+                <p class="subtitle">Organize, annotate, and track your communities locally.</p>
+              </div>
+              <div class="user-actions">
+                <button class="btn btn-ghost" id="btn-logout" type="button">Log out</button>
+              </div>
+            </div>
+
+            <div class="stats" data-animate style="--delay: 80ms;">
+              <article class="stat-tile">
+                <p class="stat-label">Total Servers</p>
+                <p class="stat-value" id="stat-total">0</p>
+              </article>
+              <article class="stat-tile">
+                <p class="stat-label">Favorites</p>
+                <p class="stat-value" id="stat-favorites">0</p>
+              </article>
+              <article class="stat-tile">
+                <p class="stat-label">Owned</p>
+                <p class="stat-value" id="stat-owned">0</p>
+              </article>
+              <article class="stat-tile">
+                <p class="stat-label">Public</p>
+                <p class="stat-value" id="stat-public">0</p>
+              </article>
+            </div>
+
+            <div class="header-actions" data-animate style="--delay: 160ms;">
+              <div class="tooltip-anchor is-tooltip-active">
+                <label class="btn btn-primary" aria-describedby="import-tooltip">
+                  Import data
+                  <input class="sr-only" id="import-input" type="file" accept="application/json" />
+                </label>
+                <span class="tooltip-pill" id="import-tooltip" role="tooltip" aria-hidden="false">
+                  Import user_data.json
+                </span>
+              </div>
+              <div class="tooltip-anchor is-tooltip-active">
+                <button class="btn btn-secondary" id="btn-export" type="button" aria-describedby="export-tooltip">
+                  Export data
+                </button>
+                <span class="tooltip-pill" id="export-tooltip" role="tooltip" aria-hidden="false">
+                  Download user_data.json
+                </span>
+              </div>
+              <div class="tooltip-anchor" id="fetch-tooltip-anchor">
+                <button class="btn btn-secondary" id="btn-fetch" type="button">Fetch public info</button>
+                <span class="tooltip-pill" id="fetch-tooltip" role="tooltip">
+                  Public widget fetch is disabled in demo mode.
+                </span>
+              </div>
+              <button class="btn btn-secondary" id="btn-instructions" type="button">Instructions</button>
+            </div>
+          </header>
+
+          <section class="search-row" aria-label="Search servers">
+            <label class="sr-only" for="search-input">Search servers</label>
+            <input
+              class="search-input"
+              id="search-input"
+              type="search"
+              placeholder="Search by name or nickname"
+              autocomplete="off"
+            />
+            <p class="search-helper" id="search-helper">Type a server name or nickname to filter.</p>
+          </section>
+
+          <section class="filter-row" aria-label="Server filters">
+            <button class="filter-chip is-active" type="button" data-filter="all" aria-pressed="true">All</button>
+            <button class="filter-chip" type="button" data-filter="owned" aria-pressed="false">Owner</button>
+            <button class="filter-chip" type="button" data-filter="partner" aria-pressed="false">Partner</button>
+            <button class="filter-chip" type="button" data-filter="verified" aria-pressed="false">Verified</button>
+            <button class="filter-chip" type="button" data-filter="boosted" aria-pressed="false">Boosted</button>
+            <button class="filter-chip" type="button" data-filter="discoverable" aria-pressed="false">Discoverable</button>
+          </section>
+
+          <section class="section hidden" id="favorites-section">
+            <div class="section-header">
+              <h2>Favorites</h2>
+              <span class="count-pill" id="favorites-count">0</span>
+            </div>
+            <div class="server-grid server-grid--constrained" id="favorites-list"></div>
+          </section>
+
+          <section class="section hidden" id="owned-section">
+            <div class="section-header">
+              <h2>Owned</h2>
+              <span class="count-pill" id="owned-count">0</span>
+            </div>
+            <div class="server-grid" id="owned-list"></div>
+          </section>
+
+          <section class="section hidden" id="public-section">
+            <div class="section-header">
+              <h2>Public</h2>
+              <span class="count-pill" id="public-count">0</span>
+            </div>
+            <div class="server-grid" id="public-list"></div>
+          </section>
+
+          <section class="section hidden" id="private-section">
+            <div class="section-header">
+              <h2>Private</h2>
+              <span class="count-pill" id="private-count">0</span>
+            </div>
+            <div class="server-grid" id="private-list"></div>
+          </section>
+
+          <section class="empty-state" id="empty-state" aria-live="polite">
+            <h3>No servers yet</h3>
+            <p>Once you sign in, your server list appears here.</p>
+          </section>
+
+          <section class="legend" aria-label="Legend">
+            <h2>Legend</h2>
+            <div class="legend-grid">
+              <div class="legend-item">
+                <span class="badge badge-partner">Partner</span>
+                <span>Discord Partner Program</span>
+              </div>
+              <div class="legend-item">
+                <span class="badge badge-verified">Verified</span>
+                <span>Officially verified server</span>
+              </div>
+              <div class="legend-item">
+                <span class="badge badge-boosted">Boosted</span>
+                <span>Nitro boost enabled</span>
+              </div>
+              <div class="legend-item">
+                <span class="badge badge-discoverable">Discoverable</span>
+                <span>Listed in Server Discovery</span>
+              </div>
+              <div class="legend-item">
+                <span class="badge badge-owner">Owner</span>
+                <span>Servers you administer</span>
+              </div>
+            </div>
+          </section>
+
+          <footer class="footer">
+            <p>Everything stays in your browser. Export regularly to back up.</p>
+          </footer>
+        </div>
+      </section>
+    </div>
+
+    <div class="modal-overlay hidden" id="fetch-modal" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fetch-title">
+        <header class="modal-header">
+          <h3 id="fetch-title">Fetch public info</h3>
+          <button class="icon-button" type="button" data-modal-close aria-label="Close">&times;</button>
+        </header>
+        <div class="modal-body">
+          <div data-fetch-step="intro">
+            <p>Fetch live widget data to capture online counts and invite links.</p>
+            <ul>
+              <li>Presence count (shown as the green dot)</li>
+              <li>Public invite link when available</li>
+            </ul>
+            <p class="muted" id="fetch-skip-info"></p>
+            <label class="checkbox-row">
+              <input type="checkbox" id="fetch-force" />
+              <span>Clear cached results and refetch all servers</span>
+            </label>
+            <div class="modal-actions">
+              <button class="btn btn-primary" id="fetch-start" type="button">Continue</button>
+              <button class="btn btn-secondary" type="button" data-modal-close>Cancel</button>
+            </div>
+          </div>
+          <div class="hidden" data-fetch-step="progress">
+            <p id="fetch-progress-text">Fetching server info...</p>
+            <div class="progress-bar">
+              <div class="progress-bar-fill" id="fetch-progress-bar"></div>
+            </div>
+            <p class="muted" id="fetch-progress-detail"></p>
+            <div class="modal-actions">
+              <button class="btn btn-danger" id="fetch-stop" type="button">Stop</button>
+            </div>
+          </div>
+          <div class="hidden" data-fetch-step="complete">
+            <p id="fetch-complete-text"></p>
+            <div class="modal-actions">
+              <button class="btn btn-secondary" type="button" data-modal-close>Close</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="instructions-modal" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="instructions-title">
+        <header class="modal-header">
+          <h3 id="instructions-title">Instructions</h3>
+          <button class="icon-button" type="button" data-modal-close aria-label="Close">&times;</button>
+        </header>
+        <div class="modal-body">
+          <h4>Export your Discord server list</h4>
+          <ol>
+            <li>Open Discord in your browser.</li>
+            <li>Open Developer Tools and switch to the Network tab.</li>
+            <li>Find a request to discord.com/api and copy the Authorization token.</li>
+            <li>Run the request below in the Console tab.</li>
+          </ol>
+          <pre class="code-block"><code>// Replace YOUR_TOKEN with your token
+fetch('https://discord.com/api/v10/users/@me/guilds', {
+  headers: { Authorization: 'YOUR_TOKEN' }
+})
+  .then((response) => response.json())
+  .then((data) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'guilds_api.json';
+    link.click();
+  });</code></pre>
+          <p class="muted">Keep your token private and never share it.</p>
+          <h4>Import options</h4>
+          <ul>
+            <li><strong>guilds_api.json</strong> merges the latest server list.</li>
+            <li><strong>user_data.json</strong> restores favorites, notes, nicknames, and widgets.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="details-modal" aria-hidden="true">
+      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="details-title">
+        <header class="modal-header">
+          <h3 id="details-title">Server details</h3>
+          <button class="icon-button" type="button" data-modal-close aria-label="Close">&times;</button>
+        </header>
+        <div class="modal-body" id="details-body"></div>
+      </div>
+    </div>
+
+    <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

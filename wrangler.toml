@@ -1,0 +1,21 @@
+# Cloudflare Pages configuration
+name = "discord-manager"
+compatibility_date = "2024-01-15"
+pages_build_output_dir = "dist"
+
+# Environment variables (set via dashboard or wrangler secret)
+# DISCORD_CLIENT_ID - Your Discord application client ID
+# DISCORD_CLIENT_SECRET - Your Discord application client secret
+# SESSION_SECRET - Random string for signing session cookies
+
+[vars]
+DISCORD_REDIRECT_URI = "http://localhost:8788/api/auth/callback"
+
+# Production overrides
+[env.production]
+kv_namespaces = [
+  { binding = "SESSIONS", id = "", preview_id = "" }
+]
+
+[env.production.vars]
+DISCORD_REDIRECT_URI = "https://your-domain.com/api/auth/callback"

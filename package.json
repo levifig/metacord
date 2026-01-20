@@ -1,0 +1,26 @@
+{
+  "name": "discord-manager",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal Discord server directory with OAuth authentication",
+  "scripts": {
+    "dev": "concurrently -k \"pnpm run dev:ui\" \"pnpm run dev:api\"",
+    "dev:ui": "vite",
+    "dev:api": "wrangler pages dev ./src --proxy 5173 --kv=SESSIONS",
+    "build": "vite build",
+    "preview": "wrangler pages dev ./dist --kv=SESSIONS",
+    "deploy": "pnpm run build && wrangler pages deploy ./dist",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "hono": "^4.11.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260118.0",
+    "@types/node": "^20.19.30",
+    "concurrently": "^8.2.2",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.21",
+    "wrangler": "^3.114.17"
+  }
+}
