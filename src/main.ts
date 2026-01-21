@@ -624,11 +624,13 @@ const performWidgetFetch = async (): Promise<void> => {
 
   const total = targets.length;
   let completed = 0;
-  let updated = 0;
+  let widgetsEnabled = 0;
+  let widgetsDisabled = 0;
+  let errors = 0;
 
   if (total === 0) {
     updateFetchModalStep('complete');
-    fetchCompleteText.textContent = 'No servers needed updates.';
+    fetchCompleteText.textContent = 'All servers are already cached. Enable "Clear cached results" to refetch.';
     return;
   }
 
@@ -639,13 +641,18 @@ const performWidgetFetch = async (): Promise<void> => {
     }
     try {
       const widget = await fetchWidget(guildId);
+      const hasData = widget.instant_invite != null || widget.presence_count != null;
       const entry: WidgetCacheEntry = {
         instantInvite: widget.instant_invite ?? null,
         presenceCount: widget.presence_count ?? null,
         lastCached: new Date().toISOString(),
       };
       state.userData = updateWidgetCache(state.userData, guildId, entry, storageOptions);
-      updated += 1;
+      if (hasData) {
+        widgetsEnabled += 1;
+      } else {
+        widgetsDisabled += 1;
+      }
     } catch (error) {
       if (error instanceof AuthError) {
         setScreen('login');
@@ -657,18 +664,24 @@ const performWidgetFetch = async (): Promise<void> => {
         lastCached: new Date().toISOString(),
       };
       state.userData = updateWidgetCache(state.userData, guildId, entry, storageOptions);
+      errors += 1;
     }
     completed += 1;
     const progress = total === 0 ? 100 : Math.round((completed / total) * 100);
     fetchProgressBar.style.width = `${progress}%`;
     fetchProgressText.textContent = `Fetching server info (${completed}/${total})`;
-    fetchProgressDetail.textContent = `${updated} servers updated`;
+    fetchProgressDetail.textContent = `${widgetsEnabled} with public data`;
   }
 
   updateFetchModalStep('complete');
+  const parts: string[] = [];
+  if (widgetsEnabled > 0) parts.push(`${widgetsEnabled} with public widgets`);
+  if (widgetsDisabled > 0) parts.push(`${widgetsDisabled} widgets disabled`);
+  if (errors > 0) parts.push(`${errors} errors`);
+  const summary = parts.length > 0 ? parts.join(', ') : 'No data found';
   fetchCompleteText.textContent = fetchShouldStop
-    ? `Stopped early. ${updated} servers updated.`
-    : `Complete. ${updated} servers updated.`;
+    ? `Stopped early. ${summary}.`
+    : `Complete. ${summary}.`;
   render();
 };
 
