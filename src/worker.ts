@@ -15,6 +15,14 @@ export default {
       return app.fetch(request, env, ctx);
     }
 
+    if (env.DEV_ASSETS_URL && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {
+      const devUrl = new URL(env.DEV_ASSETS_URL);
+      devUrl.pathname = url.pathname;
+      devUrl.search = url.search;
+
+      return fetch(new Request(devUrl.toString(), request));
+    }
+
     return env.ASSETS.fetch(request);
   },
 };
