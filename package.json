@@ -9,7 +9,8 @@
     "dev:api": "wrangler pages dev ./src --proxy 5173 --kv=SESSIONS",
     "build": "vite build",
     "preview": "wrangler pages dev ./dist --kv=SESSIONS",
-    "deploy": "pnpm run build && wrangler pages deploy ./dist",
+    "deploy": "pnpm run build && wrangler pages deploy ./dist --env=production",
+    "deploy:dev": "pnpm run build && wrangler pages deploy ./dist --env=development",
     "types": "wrangler types"
   },
   "dependencies": {

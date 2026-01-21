@@ -10,3 +10,29 @@ pages_build_output_dir = "dist"
 #   - DISCORD_CLIENT_SECRET
 #   - SESSION_SECRET (generate with: openssl rand -hex 32)
 #   - DISCORD_REDIRECT_URI (https://metacord.app/api/auth/callback or https://dev.metacord.app/api/auth/callback)
+
+[env.production]
+# Production environment (main branch)
+# Project name: metacord-prod
+# Custom domain: metacord.app
+# Deploy with: pnpm run deploy
+name = "metacord-prod"
+kv_namespaces = [
+  { binding = "SESSIONS", id = "" }
+]
+
+[env.production.vars]
+DISCORD_REDIRECT_URI = "https://metacord.app/api/auth/callback"
+
+[env.development]
+# Development environment (dev branch)
+# Project name: metacord-dev
+# Custom domain: dev.metacord.app
+# Deploy with: pnpm run deploy:dev
+name = "metacord-dev"
+kv_namespaces = [
+  { binding = "SESSIONS", id = "" }
+]
+
+[env.development.vars]
+DISCORD_REDIRECT_URI = "https://dev.metacord.app/api/auth/callback"
