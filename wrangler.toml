@@ -22,7 +22,7 @@ run_worker_first = true
 # Worker name: metacord-prod
 # Custom domain: metacord.app
 # Deploy with: pnpm run deploy
-name = "metacord-prod"
+name = "metacord-dev"
 kv_namespaces = [
   { binding = "SESSIONS", id = "89d6fd289f654bfc802fc9a3eb2e4cd6" }
 ]
