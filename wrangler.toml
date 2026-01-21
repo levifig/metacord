@@ -7,6 +7,7 @@ compatibility_date = "2026-01-21"
 directory = "dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+run_worker_first = true
 
 # Environment variables
 # For local development, DISCORD_REDIRECT_URI defaults to http://localhost:8787/api/auth/callback
