@@ -38,7 +38,7 @@ Metacord is a personal Discord server directory, allowing to keep track of curre
 2. Create Discord application:
    - Go to [Discord Developer Portal](https://discord.com/developers/applications)
    - Create new application, go to OAuth2 settings
-   - Add redirect URL: `http://localhost:8788/api/auth/callback`
+   - Add redirect URL: `http://localhost:8787/api/auth/callback`
    - Copy Client ID and Client Secret
 
 3. Create KV namespace:
@@ -54,7 +54,7 @@ Metacord is a personal Discord server directory, allowing to keep track of curre
 
    ```bash
    cp .envrc.example .envrc
-   # Edit .envrc with your Discord credentials and SESSION_SECRET
+   # Edit .envrc with your Discord credentials, SESSION_SECRET, and DEV_ASSETS_URL
    direnv allow
    ```
 
@@ -63,6 +63,8 @@ Metacord is a personal Discord server directory, allowing to keep track of curre
    ```bash
    pnpm dev
    ```
+
+Local development runs Vite on `http://localhost:5173` and Wrangler on `http://localhost:8787`. Wrangler v4 no longer supports `--proxy`, so the worker proxies non-API requests to the Vite dev server when `DEV_ASSETS_URL` is set (defaulted in `.envrc.example`) while keeping HMR active.
 
 > **Tip**: Use `?demo=1` to preview the UI without setting up OAuth. Demo mode loads mock data from a `guilds_api.json` that you can extract from the Console of your browser in a logged in session.
 

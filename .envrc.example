@@ -4,5 +4,6 @@
 
 export DISCORD_CLIENT_ID=
 export DISCORD_CLIENT_SECRET=
-export DISCORD_REDIRECT_URI=http://localhost:8788/api/auth/callback
+export DISCORD_REDIRECT_URI=http://localhost:8787/api/auth/callback
+export DEV_ASSETS_URL=http://localhost:5173
 export SESSION_SECRET=

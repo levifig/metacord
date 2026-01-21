@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "concurrently -k \"pnpm run dev:ui\" \"pnpm run dev:api\"",
     "dev:ui": "vite",
-    "dev:api": "wrangler dev --env development --kv=SESSIONS --proxy 5173",
+    "dev:api": "wrangler dev --env development --var DEV_ASSETS_URL=${DEV_ASSETS_URL:-http://localhost:5173}",
     "build": "vite build",
-    "preview": "pnpm run build && wrangler dev --env development --kv=SESSIONS",
+    "preview": "pnpm run build && wrangler dev --env development",
     "deploy": "pnpm run build && wrangler deploy --env=production",
     "deploy:prod": "pnpm run build && wrangler deploy --env=production",
     "deploy:dev": "pnpm run build && wrangler deploy --env=development",

@@ -9,7 +9,7 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 
 # Environment variables
-# For local development, DISCORD_REDIRECT_URI defaults to http://localhost:8788/api/auth/callback
+# For local development, DISCORD_REDIRECT_URI defaults to http://localhost:8787/api/auth/callback
 # For production/dev, set these in Cloudflare Workers dashboard or via wrangler secret:
 #   - DISCORD_CLIENT_ID
 #   - DISCORD_CLIENT_SECRET
