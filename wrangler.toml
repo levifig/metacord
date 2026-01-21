@@ -23,7 +23,7 @@ not_found_handling = "single-page-application"
 # Deploy with: pnpm run deploy
 name = "metacord-prod"
 kv_namespaces = [
-  { binding = "SESSIONS", id = "" }
+  { binding = "SESSIONS", id = "89d6fd289f654bfc802fc9a3eb2e4cd6" }
 ]
 
 [env.production.vars]
@@ -36,7 +36,7 @@ DISCORD_REDIRECT_URI = "https://metacord.app/api/auth/callback"
 # Deploy with: pnpm run deploy:dev
 name = "metacord-dev"
 kv_namespaces = [
-  { binding = "SESSIONS", id = "" }
+  { binding = "SESSIONS", id = "9f586389e8db4eea83367ad19c46f749" }
 ]
 
 [env.development.vars]
