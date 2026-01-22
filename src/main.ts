@@ -1,5 +1,6 @@
 import {
   AuthError,
+  RateLimitError,
   ApiGuild,
   ApiGuildMember,
   fetchGuildMember,
@@ -16,6 +17,7 @@ import {
   loadUserData,
   saveUserData,
   toggleFavorite,
+  updateLastFetchTimestamp,
   updateNickname,
   updateNotes,
   updateWidgetCache,
@@ -25,7 +27,14 @@ import {
 import { createModalController } from './components/modal';
 import { createServerCard, type ServerView } from './components/serverCard';
 import { createToastManager, type ToastManager } from './components/toast';
-import { createElement, getIconUrl } from './lib/utils';
+import {
+  createElement,
+  formatCooldownRemaining,
+  formatRelativeTime,
+  formatSecondsRemaining,
+  getCooldownRemaining,
+  getIconUrl,
+} from './lib/utils';
 
 type FilterKey = 'all' | 'owned' | 'partner' | 'verified' | 'boosted' | 'discoverable';
 type SectionKey = 'favorites' | 'owned' | 'public' | 'private';
@@ -218,47 +227,47 @@ const importModal = createModalController(getElement('import-modal'));
 const fetchModal = createModalController(getElement('fetch-modal'));
 const detailsModal = createModalController(getElement('details-modal'));
 const instructionsModal = createModalController(getElement('instructions-modal'));
+const demoModal = createModalController(getElement('demo-modal'));
 const detailsBody = getElement<HTMLElement>('details-body');
 
 const importButton = getElement<HTMLButtonElement>('btn-import');
 const importTooltip = getElement<HTMLElement>('import-tooltip');
-const importModalTitle = getElement<HTMLElement>('import-title');
-const importModalCopy = getElement<HTMLElement>('import-copy');
+const importCopy = getElement<HTMLElement>('import-copy');
+const importGuildsCard = getElement<HTMLElement>('import-guilds-card');
 const importUserCopy = getElement<HTMLElement>('import-user-copy');
 const importUserMeta = getElement<HTMLElement>('import-user-meta');
-const importGuildsCopy = getElement<HTMLElement>('import-guilds-copy');
 const importGuildsMeta = getElement<HTMLElement>('import-guilds-meta');
 const importUserInput = getElement<HTMLInputElement>('import-user-input');
 const importGuildsInput = getElement<HTMLInputElement>('import-guilds-input');
 const importStatus = getElement<HTMLElement>('import-status');
-const instructionsLink = getElement<HTMLAnchorElement>('instructions-link');
+const importInstructionsLink = getElement<HTMLButtonElement>('import-instructions-link');
+const importUserLabel = getElement<HTMLElement>('import-user-label');
+const instructionsCodeCopy = getElement<HTMLButtonElement>('instructions-code-copy');
+const instructionsCodeSnippet = getElement<HTMLPreElement>('instructions-code-snippet');
+const demoInstructionsLink = getElement<HTMLButtonElement>('demo-instructions-link');
+const demoGuildsInput = getElement<HTMLInputElement>('demo-guilds-input');
+const demoModalStatus = getElement<HTMLElement>('demo-modal-status');
 
-const getFetchStep = (step: string): HTMLElement => {
-  const element = getElement<HTMLElement>('fetch-modal').querySelector<HTMLElement>(
-    `[data-fetch-step="${step}"]`,
-  );
-  if (!element) {
-    throw new Error(`Missing fetch step: ${step}`);
-  }
-  return element;
-};
-
-const fetchIntro = getFetchStep('intro');
-const fetchProgress = getFetchStep('progress');
-const fetchComplete = getFetchStep('complete');
 const fetchSkipInfo = getElement<HTMLElement>('fetch-skip-info');
 const fetchForce = getElement<HTMLInputElement>('fetch-force');
 const fetchStart = getElement<HTMLButtonElement>('fetch-start');
-const fetchStop = getElement<HTMLButtonElement>('fetch-stop');
 const fetchButton = getElement<HTMLButtonElement>('btn-fetch');
 const fetchTooltipAnchor = getElement<HTMLElement>('fetch-tooltip-anchor');
 const fetchTooltip = getElement<HTMLElement>('fetch-tooltip');
-const fetchProgressText = getElement<HTMLElement>('fetch-progress-text');
-const fetchProgressDetail = getElement<HTMLElement>('fetch-progress-detail');
-const fetchProgressBar = getElement<HTMLElement>('fetch-progress-bar');
-const fetchCompleteText = getElement<HTMLElement>('fetch-complete-text');
+const fetchLastRun = getElement<HTMLElement>('fetch-last-run');
+const fetchProgressInline = getElement<HTMLElement>('fetch-progress-inline');
+const fetchInlineText = getElement<HTMLElement>('fetch-inline-text');
+const fetchInlineBar = getElement<HTMLElement>('fetch-inline-bar');
+const fetchInlineDetail = getElement<HTMLElement>('fetch-inline-detail');
+const fetchInlineStop = getElement<HTMLButtonElement>('fetch-inline-stop');
+
+const FETCH_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
 
 let fetchShouldStop = false;
+let fetchInProgress = false;
+let cooldownTimerId: number | undefined;
+let rateLimitTimerId: number | undefined;
+let rateLimitUntil: number | null = null;
 let demoUserDataLoaded = false;
 
 const showToast: ToastManager['show'] = (message, options) => {
@@ -270,10 +279,15 @@ const showToast: ToastManager['show'] = (message, options) => {
 
 const closeAppOverlays = (): void => {
   fetchShouldStop = true;
+  fetchInProgress = false;
+  fetchProgressInline.classList.add('hidden');
+  stopCooldownTimer();
+  stopRateLimitTimer();
   importModal.close();
   fetchModal.close();
   detailsModal.close();
   instructionsModal.close();
+  demoModal.close();
   toastRegion.replaceChildren();
 };
 
@@ -581,12 +595,104 @@ const openDetails = async (guildId: string): Promise<void> => {
   detailsBody.appendChild(actions);
 };
 
-const updateFetchModalStep = (step: 'intro' | 'progress' | 'complete'): void => {
-  if (fetchIntro && fetchProgress && fetchComplete) {
-    fetchIntro.classList.toggle('hidden', step !== 'intro');
-    fetchProgress.classList.toggle('hidden', step !== 'progress');
-    fetchComplete.classList.toggle('hidden', step !== 'complete');
+const updateFetchButtonState = (): void => {
+  if (isDemoMode) return;
+
+  // Check rate limit first (takes priority)
+  const isRateLimited = rateLimitUntil !== null && rateLimitUntil > Date.now();
+  const remaining = getCooldownRemaining(state.userData.lastFetchTimestamp, FETCH_COOLDOWN_MS);
+  const isOnCooldown = remaining > 0;
+  const isDisabled = isRateLimited || isOnCooldown || fetchInProgress;
+
+  fetchButton.disabled = isDisabled;
+  fetchButton.setAttribute('aria-disabled', isDisabled ? 'true' : 'false');
+
+  if (isRateLimited) {
+    const secondsRemaining = Math.ceil((rateLimitUntil! - Date.now()) / 1000);
+    const formatted = formatSecondsRemaining(secondsRemaining);
+    fetchTooltip.textContent = `Rate limited by Discord. Available in ${formatted}.`;
+    fetchTooltip.classList.add('is-cooldown');
+    fetchTooltipAnchor.classList.add('is-tooltip-active');
+    fetchTooltipAnchor.setAttribute('tabindex', '0');
+    fetchTooltip.setAttribute('aria-hidden', 'false');
+  } else if (isOnCooldown) {
+    const formatted = formatCooldownRemaining(remaining);
+    fetchTooltip.textContent = `Cooldown active. Available in ${formatted}.`;
+    fetchTooltip.classList.add('is-cooldown');
+    fetchTooltipAnchor.classList.add('is-tooltip-active');
+    fetchTooltipAnchor.setAttribute('tabindex', '0');
+    fetchTooltip.setAttribute('aria-hidden', 'false');
+  } else if (fetchInProgress) {
+    fetchTooltip.textContent = 'Fetch in progress...';
+    fetchTooltip.classList.remove('is-cooldown');
+    fetchTooltipAnchor.classList.add('is-tooltip-active');
+    fetchTooltipAnchor.setAttribute('tabindex', '0');
+    fetchTooltip.setAttribute('aria-hidden', 'false');
+  } else {
+    fetchTooltip.textContent = '';
+    fetchTooltip.classList.remove('is-cooldown');
+    fetchTooltipAnchor.classList.remove('is-tooltip-active');
+    fetchTooltipAnchor.removeAttribute('tabindex');
+    fetchTooltip.setAttribute('aria-hidden', 'true');
   }
+};
+
+const updateFetchLastRunDisplay = (): void => {
+  if (isDemoMode) {
+    fetchLastRun.textContent = '';
+    return;
+  }
+
+  const timestamp = state.userData.lastFetchTimestamp;
+  if (timestamp) {
+    fetchLastRun.textContent = `Last fetched ${formatRelativeTime(timestamp)}`;
+  } else {
+    fetchLastRun.textContent = '';
+  }
+};
+
+const startCooldownTimer = (): void => {
+  stopCooldownTimer();
+  const tick = (): void => {
+    updateFetchButtonState();
+    updateFetchLastRunDisplay();
+    const remaining = getCooldownRemaining(state.userData.lastFetchTimestamp, FETCH_COOLDOWN_MS);
+    if (remaining <= 0) {
+      stopCooldownTimer();
+    }
+  };
+  tick();
+  cooldownTimerId = window.setInterval(tick, 60000); // Update every minute
+};
+
+const stopCooldownTimer = (): void => {
+  if (cooldownTimerId !== undefined) {
+    window.clearInterval(cooldownTimerId);
+    cooldownTimerId = undefined;
+  }
+};
+
+const startRateLimitTimer = (retryAfterSeconds: number): void => {
+  stopRateLimitTimer();
+  rateLimitUntil = Date.now() + retryAfterSeconds * 1000;
+
+  const tick = (): void => {
+    updateFetchButtonState();
+    if (rateLimitUntil === null || rateLimitUntil <= Date.now()) {
+      stopRateLimitTimer();
+    }
+  };
+
+  tick();
+  rateLimitTimerId = window.setInterval(tick, 1000); // Update every second for rate limit
+};
+
+const stopRateLimitTimer = (): void => {
+  if (rateLimitTimerId !== undefined) {
+    window.clearInterval(rateLimitTimerId);
+    rateLimitTimerId = undefined;
+  }
+  rateLimitUntil = null;
 };
 
 const updateFetchSkipInfo = (): void => {
@@ -601,17 +707,30 @@ const updateFetchSkipInfo = (): void => {
       : `${cachedCount} servers already cached and will be skipped.`;
 };
 
+const FETCH_BATCH_SIZE = 5;
+const FETCH_BATCH_DELAY_MS = 1000;
+
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 const performWidgetFetch = async (): Promise<void> => {
   if (isDemoMode) {
     showToast('Demo mode uses local data only.');
     return;
   }
+
+  // Close modal and show inline progress
+  fetchModal.close();
   fetchShouldStop = false;
-  updateFetchModalStep('progress');
-  fetchProgressBar.classList.remove('is-stopped');
-  fetchProgressBar.style.width = '0%';
-  fetchProgressText.textContent = 'Fetching server info...';
-  fetchProgressDetail.textContent = '';
+  fetchInProgress = true;
+  updateFetchButtonState();
+
+  // Show inline progress
+  fetchProgressInline.classList.remove('hidden');
+  fetchInlineBar.classList.remove('is-stopped');
+  fetchInlineBar.style.width = '0%';
+  fetchInlineText.textContent = 'Fetching...';
+  fetchInlineDetail.textContent = '';
+
   const force = fetchForce.checked;
   if (force) {
     state.userData = clearWidgetCache(state.userData, storageOptions);
@@ -627,61 +746,120 @@ const performWidgetFetch = async (): Promise<void> => {
   let widgetsEnabled = 0;
   let widgetsDisabled = 0;
   let errors = 0;
+  let rateLimited = false;
+  let anySuccess = false;
 
   if (total === 0) {
-    updateFetchModalStep('complete');
-    fetchCompleteText.textContent = 'All servers are already cached. Enable "Clear cached results" to refetch.';
+    fetchProgressInline.classList.add('hidden');
+    fetchInProgress = false;
+    updateFetchButtonState();
+    showToast('All servers already cached', { variant: 'info' });
     return;
   }
 
-  for (const guildId of targets) {
-    if (fetchShouldStop) {
-      fetchProgressBar.classList.add('is-stopped');
+  const processBatch = async (batch: string[]): Promise<void> => {
+    const results = await Promise.allSettled(
+      batch.map(async (guildId) => {
+        const widget = await fetchWidget(guildId);
+        return { guildId, widget };
+      })
+    );
+
+    for (const result of results) {
+      if (fetchShouldStop || rateLimited) break;
+
+      if (result.status === 'fulfilled') {
+        anySuccess = true;
+        const { guildId, widget } = result.value;
+        const hasData = widget.instant_invite != null || widget.presence_count != null;
+        const entry: WidgetCacheEntry = {
+          instantInvite: widget.instant_invite ?? null,
+          presenceCount: widget.presence_count ?? null,
+          lastCached: new Date().toISOString(),
+        };
+        state.userData = updateWidgetCache(state.userData, guildId, entry, storageOptions);
+        if (hasData) {
+          widgetsEnabled += 1;
+        } else {
+          widgetsDisabled += 1;
+        }
+      } else {
+        const error = result.reason;
+        if (error instanceof AuthError) {
+          fetchProgressInline.classList.add('hidden');
+          fetchInProgress = false;
+          updateFetchButtonState();
+          setScreen('login');
+          return;
+        }
+        if (error instanceof RateLimitError) {
+          rateLimited = true;
+          fetchInlineBar.classList.add('is-stopped');
+          // Start rate limit timer if we have a retry-after value
+          if (error.retryAfter !== null && error.retryAfter > 0) {
+            startRateLimitTimer(error.retryAfter);
+            const formatted = formatSecondsRemaining(error.retryAfter);
+            showToast(`Rate limited by Discord. Available in ${formatted}.`, { variant: 'error' });
+          } else {
+            showToast('Rate limited by Discord. Try again later.', { variant: 'error' });
+          }
+          return;
+        }
+        errors += 1;
+      }
+      completed += 1;
+    }
+
+    const progress = total === 0 ? 100 : Math.round((completed / total) * 100);
+    fetchInlineBar.style.width = `${progress}%`;
+    fetchInlineText.textContent = `Fetching (${completed}/${total})`;
+    fetchInlineDetail.textContent = `${widgetsEnabled} with public data`;
+  };
+
+  // Process in batches with delay between each batch
+  for (let i = 0; i < targets.length; i += FETCH_BATCH_SIZE) {
+    if (fetchShouldStop || rateLimited) {
+      fetchInlineBar.classList.add('is-stopped');
       break;
     }
-    try {
-      const widget = await fetchWidget(guildId);
-      const hasData = widget.instant_invite != null || widget.presence_count != null;
-      const entry: WidgetCacheEntry = {
-        instantInvite: widget.instant_invite ?? null,
-        presenceCount: widget.presence_count ?? null,
-        lastCached: new Date().toISOString(),
-      };
-      state.userData = updateWidgetCache(state.userData, guildId, entry, storageOptions);
-      if (hasData) {
-        widgetsEnabled += 1;
-      } else {
-        widgetsDisabled += 1;
-      }
-    } catch (error) {
-      if (error instanceof AuthError) {
-        setScreen('login');
-        return;
-      }
-      const entry: WidgetCacheEntry = {
-        instantInvite: null,
-        presenceCount: null,
-        lastCached: new Date().toISOString(),
-      };
-      state.userData = updateWidgetCache(state.userData, guildId, entry, storageOptions);
-      errors += 1;
+
+    const batch = targets.slice(i, i + FETCH_BATCH_SIZE);
+    await processBatch(batch);
+
+    // Add delay between batches (but not after the last one)
+    if (i + FETCH_BATCH_SIZE < targets.length && !fetchShouldStop && !rateLimited) {
+      await delay(FETCH_BATCH_DELAY_MS);
     }
-    completed += 1;
-    const progress = total === 0 ? 100 : Math.round((completed / total) * 100);
-    fetchProgressBar.style.width = `${progress}%`;
-    fetchProgressText.textContent = `Fetching server info (${completed}/${total})`;
-    fetchProgressDetail.textContent = `${widgetsEnabled} with public data`;
   }
 
-  updateFetchModalStep('complete');
+  // Hide inline progress
+  fetchProgressInline.classList.add('hidden');
+  fetchInProgress = false;
+
+  // Update timestamp if any successful responses
+  if (anySuccess) {
+    state.userData = updateLastFetchTimestamp(state.userData, new Date().toISOString(), storageOptions);
+    startCooldownTimer();
+  }
+
+  updateFetchButtonState();
+  updateFetchLastRunDisplay();
+
+  // Show completion toast
   const parts: string[] = [];
-  if (widgetsEnabled > 0) parts.push(`${widgetsEnabled} with public widgets`);
-  if (widgetsDisabled > 0) parts.push(`${widgetsDisabled} widgets disabled`);
+  if (widgetsEnabled > 0) parts.push(`${widgetsEnabled} public`);
+  if (widgetsDisabled > 0) parts.push(`${widgetsDisabled} disabled`);
   if (errors > 0) parts.push(`${errors} errors`);
   const summary = parts.length > 0 ? parts.join(', ') : 'No data found';
-  fetchCompleteText.textContent = fetchShouldStop
-    ? `Stopped early. ${summary}.`
-    : `Complete. ${summary}.`;
+
+  if (rateLimited) {
+    // Toast already shown above
+  } else if (fetchShouldStop) {
+    showToast(`Stopped. ${summary}`, { variant: 'info' });
+  } else {
+    showToast(`Fetch complete. ${summary}`, { variant: 'success' });
+  }
+
   render();
 };
 
@@ -757,33 +935,39 @@ const setImportStatus = (message: string, variant: 'neutral' | 'error' = 'neutra
   importStatus.classList.toggle('is-error', variant === 'error');
 };
 
-const updateImportModalCopy = (source: 'login' | 'app'): void => {
+const updateImportModalCopy = (): void => {
   setImportStatus('', 'neutral');
-  const isDemoImport = isDemoMode;
-  importModalTitle.textContent = isDemoImport ? 'Load demo data' : 'Import data';
-  importModalCopy.textContent = isDemoImport
-    ? 'Load guilds_api.json to enter demo mode. user_data.json is optional.'
-    : 'Choose what you want to import.';
-  if (isDemoImport) {
+  importGuildsCard.classList.toggle('hidden', !isDemoMode);
+  if (isDemoMode) {
+    importCopy.textContent =
+      'Import your Discord data. Start with your server list, then optionally restore your backup.';
     importUserCopy.textContent =
       'Restore favorites, notes, nicknames, and widgets from a backup.';
     importUserMeta.textContent = 'Optional in demo mode.';
-    importGuildsCopy.textContent =
-      'Export from the Discord API /users/@me/guilds endpoint or use the legacy export.';
-    importGuildsMeta.textContent = 'Required to enter demo mode.';
-  } else {
-    importUserCopy.textContent =
-      'Restore favorites, notes, nicknames, and widgets from a backup.';
-    importUserMeta.textContent = 'Primary import.';
-    importGuildsCopy.textContent =
-      'Export from the Discord API /users/@me/guilds endpoint or use the legacy export.';
     importGuildsMeta.textContent = 'Optional if you have it.';
+    importUserLabel.textContent = 'Optional';
+    importUserLabel.classList.remove('hidden');
+  } else {
+    importCopy.textContent = 'Restore your favorites, notes, nicknames, and widgets from a backup.';
+    importUserCopy.textContent =
+      'Export your user data from the app to create a backup, then restore it here.';
+    importUserMeta.textContent = '';
+    importUserLabel.textContent = '';
+    importUserLabel.classList.add('hidden');
   }
 };
 
-const openImportModal = (source: 'login' | 'app', trigger?: HTMLElement | null): void => {
-  updateImportModalCopy(source);
+const openImportModal = (trigger?: HTMLElement | null): void => {
+  updateImportModalCopy();
   importModal.open(trigger);
+};
+
+const setDemoModalStatus = (
+  message: string,
+  variant: 'neutral' | 'error' = 'neutral',
+): void => {
+  demoModalStatus.textContent = message;
+  demoModalStatus.classList.toggle('is-error', variant === 'error');
 };
 
 const saveDemoGuilds = (guilds: ApiGuild[]): void => {
@@ -842,6 +1026,44 @@ const createDemoUserData = (guilds: ApiGuild[]): UserDataStore => {
   return next;
 };
 
+const createCopyHandler = (
+  button: HTMLButtonElement,
+  getText: () => string,
+): (() => Promise<void>) => {
+  let timeoutId: number | undefined;
+  const originalLabel = button.getAttribute('aria-label') ?? 'Copy code to clipboard';
+
+  return async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(getText());
+
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+
+      button.classList.add('is-copied');
+      button.setAttribute('aria-label', 'Copied!');
+      const icon = button.querySelector('i');
+      if (icon) {
+        icon.classList.remove('fa-copy');
+        icon.classList.add('fa-check');
+      }
+
+      timeoutId = window.setTimeout(() => {
+        button.classList.remove('is-copied');
+        button.setAttribute('aria-label', originalLabel);
+        if (icon) {
+          icon.classList.remove('fa-check');
+          icon.classList.add('fa-copy');
+        }
+        timeoutId = undefined;
+      }, 2000);
+    } catch {
+      showToast('Unable to copy code', { variant: 'error' });
+    }
+  };
+};
+
 const attachFilterTooltips = (): void => {
   document.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach((button) => {
     if (button.closest('.tooltip-anchor')) {
@@ -881,8 +1103,10 @@ const applyDemoData = (guilds: ApiGuild[], options?: { resetUserData?: boolean }
 };
 
 const handleDemoFile = async (file: File): Promise<boolean> => {
-  setDemoStatus('Loading...', 'neutral');
-  setImportStatus('Loading...', 'neutral');
+  const filename = file.name;
+  setDemoStatus(`Loading ${filename}...`, 'neutral');
+  setImportStatus(`Loading ${filename}...`, 'neutral');
+  setDemoModalStatus(`Selected: ${filename}`, 'neutral');
   try {
     const content = await file.text();
     const parsed: unknown = JSON.parse(content);
@@ -896,11 +1120,13 @@ const handleDemoFile = async (file: File): Promise<boolean> => {
     applyDemoData(guilds, { resetUserData: shouldResetUserData });
     setDemoStatus('Loaded.', 'neutral');
     setImportStatus('Loaded.', 'neutral');
+    setDemoModalStatus('Loaded.', 'neutral');
     return true;
   } catch (error) {
     console.error(error);
     setDemoStatus('Invalid file. Expect guilds_api.json.', 'error');
     setImportStatus('Invalid file. Expect guilds_api.json.', 'error');
+    setDemoModalStatus('Invalid file. Expect guilds_api.json.', 'error');
     return false;
   }
 };
@@ -957,12 +1183,14 @@ const setupEvents = (): void => {
   getElement<HTMLButtonElement>('btn-export').addEventListener('click', handleExport);
 
   if (!isDemoMode) {
-    fetchTooltip.setAttribute('aria-hidden', 'true');
     fetchButton.addEventListener('click', () => {
-      updateFetchModalStep('intro');
       updateFetchSkipInfo();
       fetchModal.open();
     });
+    // Initialize cooldown state
+    updateFetchButtonState();
+    updateFetchLastRunDisplay();
+    startCooldownTimer();
   } else {
     fetchButton.disabled = true;
     fetchButton.setAttribute('aria-disabled', 'true');
@@ -988,16 +1216,26 @@ const setupEvents = (): void => {
   });
 
   importButton.addEventListener('click', (event) => {
-    openImportModal('app', event.currentTarget as HTMLElement);
+    openImportModal(event.currentTarget as HTMLElement);
   });
 
-  instructionsLink.addEventListener('click', (event) => {
-    event.preventDefault();
+  importInstructionsLink.addEventListener('click', (event) => {
+    instructionsModal.open(event.currentTarget as HTMLElement);
+  });
+
+  const handleInstructionsCodeCopy = createCopyHandler(
+    instructionsCodeCopy,
+    () => instructionsCodeSnippet.textContent ?? '',
+  );
+  instructionsCodeCopy.addEventListener('click', handleInstructionsCodeCopy);
+
+  demoInstructionsLink.addEventListener('click', (event) => {
     instructionsModal.open(event.currentTarget as HTMLElement);
   });
 
   demoImportButton.addEventListener('click', (event) => {
-    openImportModal('login', event.currentTarget as HTMLElement);
+    setDemoModalStatus('', 'neutral');
+    demoModal.open(event.currentTarget as HTMLElement);
   });
 
   importUserInput.addEventListener('change', () => {
@@ -1033,10 +1271,26 @@ const setupEvents = (): void => {
     importGuildsInput.value = '';
   });
 
+  demoGuildsInput.addEventListener('change', () => {
+    const file = demoGuildsInput.files?.[0];
+    if (!file) {
+      return;
+    }
+    const handleImportFlow = async (): Promise<void> => {
+      const success = await handleDemoFile(file);
+      if (success) {
+        demoUserDataLoaded = false;
+        demoModal.close();
+      }
+    };
+    void handleImportFlow();
+    demoGuildsInput.value = '';
+  });
+
   fetchStart.addEventListener('click', () => {
     void performWidgetFetch();
   });
-  fetchStop.addEventListener('click', () => {
+  fetchInlineStop.addEventListener('click', () => {
     fetchShouldStop = true;
   });
   fetchForce.addEventListener('change', updateFetchSkipInfo);

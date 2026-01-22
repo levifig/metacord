@@ -364,6 +364,27 @@ app.get('/api/widget/:id', async (c) => {
         { ttlSeconds: 60, swrSeconds: 120, visibility: 'public' }
       );
     }
+    if (widgetResponse.status === 429) {
+      const retryAfterHeader = widgetResponse.headers.get('Retry-After');
+      let retryAfter: number | null = retryAfterHeader ? parseInt(retryAfterHeader, 10) : null;
+
+      // Also check JSON body for retry_after if header not present
+      if (retryAfter === null) {
+        try {
+          const body = await widgetResponse.json() as { retry_after?: number };
+          if (body.retry_after) {
+            retryAfter = Math.ceil(body.retry_after);
+          }
+        } catch {
+          // Ignore JSON parse errors
+        }
+      }
+
+      return c.json(
+        { error: 'Rate limited', retryAfter },
+        { status: 429, headers: retryAfter ? { 'Retry-After': String(retryAfter) } : {} }
+      );
+    }
     return errorResponse('Failed to fetch widget', 500);
   }
 

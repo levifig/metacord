@@ -32,6 +32,15 @@ export class AuthError extends Error {
   }
 }
 
+export class RateLimitError extends Error {
+  retryAfter: number | null;
+  constructor(retryAfter: number | null = null) {
+    super('Rate limited');
+    this.name = 'RateLimitError';
+    this.retryAfter = retryAfter;
+  }
+}
+
 const DEFAULT_HEADERS: HeadersInit = {
   Accept: 'application/json',
 };
@@ -48,6 +57,11 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
 
   if (response.status === 401) {
     throw new AuthError();
+  }
+
+  if (response.status === 429) {
+    const retryAfter = response.headers.get('Retry-After');
+    throw new RateLimitError(retryAfter ? parseInt(retryAfter, 10) : null);
   }
 
   if (!response.ok) {
