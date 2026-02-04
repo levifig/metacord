@@ -15,6 +15,7 @@ import { createElement, getIconUrl } from './utils';
 import { fetchGuildMember } from './api';
 import {
   type FilterKey,
+  type SortKey,
   getElement,
   getSections,
   isDemoMode,
@@ -163,6 +164,27 @@ export const sortByBannerThenName = (a: ServerView, b: ServerView): number => {
   return nameA.localeCompare(nameB);
 };
 
+export const getSortComparator = (sortKey: SortKey): ((a: ServerView, b: ServerView) => number) => {
+  switch (sortKey) {
+    case 'name-desc':
+      return (a, b) => {
+        const nameA = getDisplayName(a);
+        const nameB = getDisplayName(b);
+        return nameB.localeCompare(nameA);
+      };
+    case 'online-desc':
+      return (a, b) => {
+        const countA = a.widget?.presenceCount ?? -1;
+        const countB = b.widget?.presenceCount ?? -1;
+        if (countA !== countB) return countB - countA;
+        return getDisplayName(a).localeCompare(getDisplayName(b));
+      };
+    case 'name-asc':
+    default:
+      return sortByName;
+  }
+};
+
 // --- Section rendering ---
 
 let _detailsModal: ModalController | null = null;
@@ -207,14 +229,15 @@ export const render = (): void => {
     matchesFilter(server, state.activeFilters) && matchesSearch(server, state.search.trim()),
   );
 
-  const favorites = filtered.filter((server) => server.isFavorite).sort(sortByName);
-  const owned = filtered.filter((server) => server.owner && !server.isFavorite).sort(sortByName);
+  const comparator = getSortComparator(state.sort);
+  const favorites = filtered.filter((server) => server.isFavorite).sort(comparator);
+  const owned = filtered.filter((server) => server.owner && !server.isFavorite).sort(comparator);
   const publicServers = filtered
     .filter((server) => !server.owner && !server.isFavorite && Boolean(server.widget?.instantInvite))
-    .sort(sortByBannerThenName);
+    .sort(comparator);
   const privateServers = filtered
     .filter((server) => !server.owner && !server.isFavorite && !server.widget?.instantInvite)
-    .sort(sortByBannerThenName);
+    .sort(comparator);
 
   renderSection('favorites', favorites);
   renderSection('owned', owned);

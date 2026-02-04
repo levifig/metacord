@@ -210,16 +210,26 @@
                 Clear
               </button>
             </div>
-            <div class="filter-search">
-              <label class="sr-only" for="search-input">Search servers</label>
-              <input
-                class="search-input"
-                id="search-input"
-                type="search"
-                placeholder="Search by name or nickname"
-                autocomplete="off"
-              />
-              <span class="sr-only" id="search-helper" aria-live="polite"></span>
+            <div class="filter-controls">
+              <div class="sort-control">
+                <label for="sort-select" class="sr-only">Sort servers</label>
+                <select id="sort-select" class="sort-select">
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                  <option value="online-desc">Online ↓</option>
+                </select>
+              </div>
+              <div class="filter-search">
+                <label class="sr-only" for="search-input">Search servers</label>
+                <input
+                  class="search-input"
+                  id="search-input"
+                  type="search"
+                  placeholder="Search by name or nickname"
+                  autocomplete="off"
+                />
+                <span class="sr-only" id="search-helper" aria-live="polite"></span>
+              </div>
             </div>
           </section>
 

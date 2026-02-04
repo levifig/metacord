@@ -2,8 +2,10 @@ import { loadUserData, type UserDataStore } from './storage';
 
 export type FilterKey = 'all' | 'owned' | 'partner' | 'verified' | 'boosted' | 'discoverable';
 export type SectionKey = 'favorites' | 'owned' | 'public' | 'private';
+export type SortKey = 'name-asc' | 'name-desc' | 'online-desc';
 
 export const COLLAPSED_SECTIONS_KEY = 'discord_manager_collapsed_sections';
+export const SORT_PREFERENCE_KEY = 'discord_manager_sort_preference';
 export const DEMO_GUILDS_KEY = 'discord_manager_demo_guilds';
 export const DEMO_STORAGE_KEY = 'discord_manager_demo_user_data';
 export const FETCH_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
@@ -22,6 +24,7 @@ export interface AppState {
   userData: UserDataStore;
   activeFilters: Set<FilterKey>;
   search: string;
+  sort: SortKey;
 }
 
 export interface SectionElements {
@@ -72,6 +75,24 @@ export const saveCollapsedSections = (collapsed: Set<SectionKey>): void => {
   localStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify([...collapsed]));
 };
 
+const VALID_SORT_KEYS: SortKey[] = ['name-asc', 'name-desc', 'online-desc'];
+
+export const loadSortPreference = (): SortKey => {
+  try {
+    const stored = localStorage.getItem(SORT_PREFERENCE_KEY);
+    if (stored && VALID_SORT_KEYS.includes(stored as SortKey)) {
+      return stored as SortKey;
+    }
+  } catch {
+    // ignore
+  }
+  return 'name-asc';
+};
+
+export const saveSortPreference = (sort: SortKey): void => {
+  localStorage.setItem(SORT_PREFERENCE_KEY, sort);
+};
+
 export const collapsedSections = loadCollapsedSections();
 
 export const isDemoMode = new URLSearchParams(window.location.search).get('demo') === '1';
@@ -83,6 +104,7 @@ export const state: AppState = {
   userData: loadUserData(storageOptions),
   activeFilters: new Set<FilterKey>(),
   search: '',
+  sort: loadSortPreference(),
 };
 
 let _sections: Record<string, SectionElements> | null = null;

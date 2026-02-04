@@ -5,12 +5,14 @@ import type { ModalController } from '../components/modal';
 import {
   type FilterKey,
   type SectionKey,
+  type SortKey,
   collapsedSections,
   filterTooltipCopy,
   getElement,
   getSections,
   isDemoMode,
   saveCollapsedSections,
+  saveSortPreference,
   state,
   storageOptions,
 } from './state';
@@ -72,6 +74,16 @@ const clearFilters = (): void => {
 const updateSearch = (value: string): void => {
   state.search = value;
   render();
+};
+
+const VALID_SORT_KEYS: SortKey[] = ['name-asc', 'name-desc', 'online-desc'];
+
+const updateSort = (value: string): void => {
+  if (VALID_SORT_KEYS.includes(value as SortKey)) {
+    state.sort = value as SortKey;
+    saveSortPreference(state.sort);
+    render();
+  }
 };
 
 const setSectionCollapsed = (sectionKey: SectionKey, collapsed: boolean): void => {
@@ -304,6 +316,15 @@ export const setupEvents = (options: SetupEventsOptions): void => {
     const target = event.target as HTMLInputElement;
     updateSearch(target.value);
   });
+
+  const sortSelectEl = document.getElementById('sort-select');
+  if (sortSelectEl) {
+    (sortSelectEl as unknown as HTMLSelectElement).value = state.sort;
+    sortSelectEl.addEventListener('change', (event) => {
+      const target = event.target as unknown as HTMLSelectElement;
+      updateSort(target.value);
+    });
+  }
 
   getElement<HTMLButtonElement>('btn-export').addEventListener('click', handleExport);
 
