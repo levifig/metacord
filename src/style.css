@@ -214,6 +214,42 @@ img {
   color: var(--color-danger);
 }
 
+.error-screen {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: var(--space-12) var(--space-6);
+}
+
+.error-screen[aria-hidden='true'] {
+  display: none;
+}
+
+.error-content {
+  width: min(420px, 100%);
+  background: linear-gradient(150deg, rgba(38, 45, 56, 0.9), rgba(22, 26, 32, 0.95));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-5);
+  padding: var(--space-12);
+  box-shadow: var(--shadow-3);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.error-content h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  color: var(--color-text);
+}
+
+.error-content p {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
 .app-shell[aria-hidden='true'],
 .login-screen[aria-hidden='true'] {
   display: none;

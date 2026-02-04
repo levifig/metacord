@@ -7,6 +7,37 @@ import { fetchState, initFetchOrchestrator, stopCooldownTimer, stopRateLimitTime
 import { hydrateDemo, setupDemoMode } from './lib/demo';
 import { setupEvents } from './lib/events';
 
+// --- Error boundary ---
+
+const showErrorScreen = (): void => {
+  const errorScreen = document.getElementById('error-screen');
+  const loginScreen = document.getElementById('login-screen');
+  const appShell = document.getElementById('app-shell');
+
+  if (errorScreen) {
+    errorScreen.classList.remove('hidden');
+    errorScreen.setAttribute('aria-hidden', 'false');
+  }
+  if (loginScreen) {
+    loginScreen.classList.add('hidden');
+    loginScreen.setAttribute('aria-hidden', 'true');
+  }
+  if (appShell) {
+    appShell.classList.add('hidden');
+    appShell.setAttribute('aria-hidden', 'true');
+  }
+};
+
+window.onerror = (_message, _source, _lineno, _colno, error) => {
+  console.error('Unhandled error:', error);
+  showErrorScreen();
+};
+
+window.onunhandledrejection = (event: PromiseRejectionEvent) => {
+  console.error('Unhandled promise rejection:', event.reason);
+  showErrorScreen();
+};
+
 // --- Footer ---
 
 const setFooterYear = (): void => {
@@ -95,12 +126,17 @@ const hydrateApp = async (): Promise<void> => {
 
 // --- Boot ---
 
-setFooterYear();
-setFooterBuildInfo();
-setupEvents({ importModal, fetchModal, instructionsModal, demoModal });
-setupDemoMode();
-if (isDemoMode) {
-  hydrateDemo();
-} else {
-  void hydrateApp();
+try {
+  setFooterYear();
+  setFooterBuildInfo();
+  setupEvents({ importModal, fetchModal, instructionsModal, demoModal });
+  setupDemoMode();
+  if (isDemoMode) {
+    hydrateDemo();
+  } else {
+    void hydrateApp();
+  }
+} catch (error) {
+  console.error('Boot failure:', error);
+  showErrorScreen();
 }

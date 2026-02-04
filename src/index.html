@@ -52,6 +52,14 @@
         </div>
       </section>
 
+      <div id="error-screen" class="error-screen hidden" aria-hidden="true">
+        <div class="error-content">
+          <h2>Something went wrong</h2>
+          <p class="muted">An unexpected error occurred. Try reloading the page.</p>
+          <button class="btn btn-primary" onclick="window.location.reload()">Reload</button>
+        </div>
+      </div>
+
       <section class="app-shell hidden" id="app-shell" aria-hidden="true">
         <div class="container">
           <header class="app-header" data-animate style="--delay: 0ms">
