@@ -2,7 +2,8 @@ import { serializeCookie, parseCookies } from './cookies';
 import { decryptToken, encryptToken } from './crypto';
 import { DiscordTokenResponse, Env, SessionData, SessionRecord } from './types';
 
-const SESSION_COOKIE_NAME = '__Host-session';
+const SESSION_COOKIE_NAME_SECURE = '__Host-session';
+const SESSION_COOKIE_NAME_INSECURE = 'session';
 const SESSION_TTL_SECONDS = 60 * 30;
 const REFRESH_WINDOW_MS = 5 * 60 * 1000;
 const DISCORD_TOKEN_URL = 'https://discord.com/api/oauth2/token';
@@ -12,42 +13,55 @@ export interface SessionContext {
   session: SessionData | null;
   setCookie?: string;
   clearCookie?: string;
+  secure: boolean;
 }
 
-export function getSessionCookieName(): string {
-  return SESSION_COOKIE_NAME;
+/**
+ * Determines if the request is coming from a secure context (HTTPS).
+ * Used to decide whether to use __Host- prefixed cookies with secure flag.
+ */
+export function isSecureContext(request?: Request): boolean {
+  if (!request) return true;
+  const url = new URL(request.url);
+  return url.protocol === 'https:';
 }
 
-export function buildSessionCookie(sessionId: string): string {
-  return serializeCookie(SESSION_COOKIE_NAME, sessionId, {
+export function getSessionCookieName(secure: boolean = true): string {
+  return secure ? SESSION_COOKIE_NAME_SECURE : SESSION_COOKIE_NAME_INSECURE;
+}
+
+export function buildSessionCookie(sessionId: string, secure: boolean = true): string {
+  return serializeCookie(getSessionCookieName(secure), sessionId, {
     path: '/',
     httpOnly: true,
-    secure: true,
+    secure: secure,
     sameSite: 'Lax',
     maxAge: SESSION_TTL_SECONDS,
   });
 }
 
-export function buildClearSessionCookie(): string {
-  return serializeCookie(SESSION_COOKIE_NAME, '', {
+export function buildClearSessionCookie(secure: boolean = true): string {
+  return serializeCookie(getSessionCookieName(secure), '', {
     path: '/',
     httpOnly: true,
-    secure: true,
+    secure: secure,
     sameSite: 'Lax',
     maxAge: 0,
   });
 }
 
 export async function getSessionContext(request: Request, env: Env): Promise<SessionContext> {
+  const secure = isSecureContext(request);
+  const cookieName = getSessionCookieName(secure);
   const cookies = parseCookies(request.headers.get('Cookie'));
-  const sessionId = cookies[SESSION_COOKIE_NAME];
+  const sessionId = cookies[cookieName];
   if (!sessionId) {
-    return { sessionId: null, session: null };
+    return { sessionId: null, session: null, secure };
   }
 
   const record = await env.SESSIONS.get<SessionRecord>(sessionId, 'json');
   if (!record) {
-    return { sessionId, session: null, clearCookie: buildClearSessionCookie() };
+    return { sessionId, session: null, clearCookie: buildClearSessionCookie(secure), secure };
   }
 
   try {
@@ -65,7 +79,7 @@ export async function getSessionContext(request: Request, env: Env): Promise<Ses
       const refreshed = await refreshSession(sessionId, session, env);
       if (!refreshed) {
         await deleteSession(sessionId, env);
-        return { sessionId, session: null, clearCookie: buildClearSessionCookie() };
+        return { sessionId, session: null, clearCookie: buildClearSessionCookie(secure), secure };
       }
       session = refreshed;
     } else {
@@ -75,11 +89,12 @@ export async function getSessionContext(request: Request, env: Env): Promise<Ses
     return {
       sessionId,
       session,
-      setCookie: buildSessionCookie(sessionId),
+      setCookie: buildSessionCookie(sessionId, secure),
+      secure,
     };
   } catch {
     await deleteSession(sessionId, env);
-    return { sessionId, session: null, clearCookie: buildClearSessionCookie() };
+    return { sessionId, session: null, clearCookie: buildClearSessionCookie(secure), secure };
   }
 }
 

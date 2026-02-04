@@ -23,7 +23,7 @@ We needed to decide on tooling, session management, API caching strategy, and de
 | Runtime | pnpm + Wrangler | Package manager + local dev parity with production |
 | Backend | Hono on Cloudflare Workers | Lightweight, edge-native, catch-all routing |
 | Frontend | Vite + TypeScript | Fast HMR, modern bundling, type safety |
-| Hosting | Cloudflare Pages | Static frontend + Functions, single deployment |
+| Hosting | Cloudflare Workers | Static assets + Worker entry, single deployment |
 | Sessions | Workers KV | Low-latency key-value, integrated with Workers |
 
 ### OAuth and Session Handling
@@ -52,7 +52,7 @@ We needed to decide on tooling, session management, API caching strategy, and de
 ### Positive
 
 - Single platform (Cloudflare) simplifies deployment and billing
-- No CORS issues (Pages + Workers same origin)
+- No CORS issues (assets + Worker same origin)
 - Edge-native performance globally
 - Local-first user data respects privacy
 

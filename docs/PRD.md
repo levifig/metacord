@@ -40,15 +40,15 @@ All infrastructure hosted on Cloudflare. GitHub used for version control only.
 |                    Cloudflare Platform                          |
 |                                                                 |
 |  +-----------------------------------------------------------+  |
-|  |                  Cloudflare Pages                         |  |
-|  |                (Static Frontend SPA)                      |  |
+|  |                  Cloudflare Workers                       |  |
+|  |                (Static Assets SPA)                        |  |
 |  |              discord.yourdomain.com                       |  |
 |  +-----------------------------------------------------------+  |
 |                                |                                |
 |                                v                                |
 |  +-----------------------------------------------------------+  |
-|  |              Pages Functions (Hono Router)                |  |
-|  |           functions/api/[[route]].ts (catch-all)          |  |
+|  |                Worker API (Hono Router)                   |  |
+|  |           src/worker.ts (assets + API)                    |  |
 |  |           discord.yourdomain.com/api/*                    |  |
 |  |                                                           |  |
 |  |  * GET  /api/auth/login     - Redirect to Discord OAuth   |  |
@@ -79,15 +79,15 @@ All infrastructure hosted on Cloudflare. GitHub used for version control only.
 | Component | Choice | Rationale |
 |-----------|--------|-----------|
 | Version Control | GitHub | Industry standard, CI/CD integration |
-| Frontend Host | Cloudflare Pages | Free, auto-deploy from GitHub, global CDN, same-domain as API |
-| Backend | Cloudflare Workers | Free tier (100k req/day), global edge, no cold starts, native Pages integration |
+| Frontend Host | Cloudflare Workers (Assets) | Free, auto-deploy from GitHub, global CDN, same-domain as API |
+| Backend | Cloudflare Workers | Free tier (100k req/day), global edge, no cold starts, native asset integration |
 | Session Storage | Workers KV | Simple key-value, integrated with Workers, 100k reads/day free |
 | User Data | localStorage + export | Privacy-first, user owns their data |
 
 ### Benefits of All-Cloudflare
 
 - **Single platform** — unified dashboard, billing, and domain management
-- **No CORS issues** — Pages and Workers share the same domain
+- **No CORS issues** — Assets and API share the same domain
 - **Auto-deployment** — push to GitHub triggers automatic deploy
 - **Global edge** — both frontend and API served from 300+ locations
 - **Zero cold starts** — Workers are always warm
@@ -253,15 +253,15 @@ tsconfig.node.json        # Node-specific TS config
 - CSS variables for theming
 - Demo mode: `?demo=1` loads local `guilds_api.json`, uses isolated localStorage keys
 
-### Backend (Pages Functions)
-- Hono router in `functions/api/[[route]].ts`
+### Backend (Workers)
+- Hono router in `functions/api/[[route]].ts`, exposed via `src/worker.ts`
 - TypeScript with strict mode
 - Workers KV for encrypted session storage
 - Environment variables: `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_REDIRECT_URI`, `SESSION_SECRET`
 
 ### Infrastructure (Cloudflare)
-- Cloudflare Pages for frontend (auto-deploy from GitHub)
-- Pages Functions for API (integrated Workers runtime)
+- Cloudflare Workers for frontend assets (auto-deploy from GitHub)
+- Worker entry for API (integrated Hono runtime)
 - Workers KV for session storage
 - Edge caching via Cache API
 - Custom domain with automatic SSL
@@ -304,7 +304,7 @@ tsconfig.node.json        # Node-specific TS config
 | Dependency | Type | Risk |
 |------------|------|------|
 | Discord API | External | Medium — API changes, rate limits |
-| Cloudflare (Pages, Workers, KV) | Infrastructure | Low — highly reliable, 99.9% SLA |
+| Cloudflare (Workers, KV, Assets) | Infrastructure | Low — highly reliable, 99.9% SLA |
 | GitHub | Version Control | Low — code only, no runtime dependency |
 
 ## Open Questions

@@ -14,8 +14,8 @@ Metacord is a personal Discord server directory, allowing to keep track of curre
 
 ## Architecture
 
-- **Frontend**: Static SPA (Vite + TypeScript) on Cloudflare Pages
-- **Backend**: Hono catch-all router in Pages Functions (`/api/*`)
+- **Frontend**: Static SPA (Vite + TypeScript) served by Cloudflare Workers assets
+- **Backend**: Hono catch-all router in a Workers entry (`/api/*`)
 - **Auth**: Discord OAuth with PKCE, AES-GCM encrypted tokens in Workers KV
 - **Storage**: KV for sessions, localStorage for user preferences
 
@@ -38,7 +38,7 @@ Metacord is a personal Discord server directory, allowing to keep track of curre
 2. Create Discord application:
    - Go to [Discord Developer Portal](https://discord.com/developers/applications)
    - Create new application, go to OAuth2 settings
-   - Add redirect URL: `http://localhost:8788/api/auth/callback`
+   - Add redirect URL: `http://localhost:8787/api/auth/callback`
    - Copy Client ID and Client Secret
 
 3. Create KV namespace:
@@ -50,12 +50,11 @@ Metacord is a personal Discord server directory, allowing to keep track of curre
 
    Add the IDs to `wrangler.toml`
 
-4. Configure secrets (requires [direnv](https://direnv.net/)):
+4. Configure local secrets for Wrangler:
 
    ```bash
-   cp .envrc.example .envrc
-   # Edit .envrc with your Discord credentials and SESSION_SECRET
-   direnv allow
+   cp .dev.vars.development.example .dev.vars.development
+   # Edit .dev.vars.development with your Discord credentials, SESSION_SECRET, and DEV_ASSETS_URL
    ```
 
 5. Start development:
@@ -63,6 +62,8 @@ Metacord is a personal Discord server directory, allowing to keep track of curre
    ```bash
    pnpm dev
    ```
+
+Local development runs Vite on `http://localhost:5173` and Wrangler on `http://localhost:8787`. Wrangler v4 no longer supports `--proxy`, so the worker proxies non-API requests to the Vite dev server when `DEV_ASSETS_URL` is set (defaulted in `.dev.vars.development.example`) while keeping HMR active.
 
 > **Tip**: Use `?demo=1` to preview the UI without setting up OAuth. Demo mode loads mock data from a `guilds_api.json` that you can extract from the Console of your browser in a logged in session.
 
@@ -85,6 +86,7 @@ metacord/
 ├── src/
 │   ├── index.html          # SPA entry point
 │   ├── main.ts             # Application logic
+│   ├── worker.ts           # Cloudflare Worker entry (assets + API)
 │   ├── style.css           # Styles with CSS variables
 │   ├── components/         # UI components (modal, serverCard, toast)
 │   └── lib/                # Frontend helpers (api, storage, utils)
@@ -98,7 +100,7 @@ metacord/
 ├── vite.config.ts          # Vite build config
 ├── wrangler.toml           # Cloudflare config
 ├── tsconfig.json           # TypeScript config
-└── .envrc.example          # Environment template (direnv)
+└── .dev.vars.development.example # Local Wrangler dev secrets template
 ```
 
 ## License

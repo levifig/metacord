@@ -37,3 +37,51 @@ export const createElement = <T extends keyof HTMLElementTagNameMap>(
 export const safelySetText = (element: HTMLElement, value: string): void => {
   element.textContent = value;
 };
+
+export const formatRelativeTime = (isoTimestamp: string): string => {
+  const now = Date.now();
+  const then = new Date(isoTimestamp).getTime();
+  const diffMs = now - then;
+
+  if (diffMs < 0) return 'just now';
+
+  const seconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const weeks = Math.floor(days / 7);
+
+  if (seconds < 60) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  return `${weeks}w ago`;
+};
+
+export const getCooldownRemaining = (lastFetchTimestamp: string | null, cooldownMs: number): number => {
+  if (!lastFetchTimestamp) return 0;
+  const now = Date.now();
+  const then = new Date(lastFetchTimestamp).getTime();
+  const elapsed = now - then;
+  const remaining = cooldownMs - elapsed;
+  return remaining > 0 ? remaining : 0;
+};
+
+export const formatCooldownRemaining = (remainingMs: number): string => {
+  if (remainingMs <= 0) return '';
+  const minutes = Math.ceil(remainingMs / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (remainingMinutes === 0) return `${hours}h`;
+  return `${hours}h ${remainingMinutes}m`;
+};
+
+export const formatSecondsRemaining = (seconds: number): string => {
+  if (seconds <= 0) return '0s';
+  if (seconds < 60) return `${Math.ceil(seconds)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.ceil(seconds % 60);
+  if (remainingSeconds === 0) return `${minutes}m`;
+  return `${minutes}m ${remainingSeconds}s`;
+};

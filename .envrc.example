@@ -1,8 +1,0 @@
-# Copy this file to .envrc and fill in your values
-# Run `direnv allow` to load environment variables
-# These are used for local development with `wrangler pages dev`
-
-export DISCORD_CLIENT_ID=
-export DISCORD_CLIENT_SECRET=
-export DISCORD_REDIRECT_URI=http://localhost:8788/api/auth/callback
-export SESSION_SECRET=

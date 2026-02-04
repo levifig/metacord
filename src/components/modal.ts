@@ -49,6 +49,7 @@ export const createModalController = (overlay: HTMLElement): ModalController => 
     overlay.classList.remove('hidden');
     overlay.classList.add('is-open');
     overlay.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
     window.setTimeout(() => {
       const focusable = getFocusable();
       if (focusable.length > 0) {
@@ -65,6 +66,7 @@ export const createModalController = (overlay: HTMLElement): ModalController => 
     overlay.classList.remove('is-open');
     overlay.classList.add('hidden');
     overlay.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
     document.removeEventListener('keydown', handleKeydown);
     if (lastFocused) {
       lastFocused.focus();

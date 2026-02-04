@@ -5,11 +5,15 @@ dist/
 .env
 .env.*
 .envrc
+.dev.vars
+.dev.vars.*
 .pnpm-store/
 .DS_Store
 *.log
+*.har
 tmp/
 guilds_api.json
 servers_data.json
 .serena/
 .agents/
+worker-configuration.d.ts

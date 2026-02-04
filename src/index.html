@@ -18,7 +18,7 @@
             <span class="brand-mark" aria-hidden="true"></span>
             <span class="brand-name">Metacord</span>
           </div>
-          <h1 class="login-title">Welcome back</h1>
+          <h1 class="login-title">Get started</h1>
           <p class="login-copy">
             No data stored on our servers.<br />
             Everything stays in your browser.<br />
@@ -45,9 +45,9 @@
               id="demo-import-button"
               type="button"
             >
-              Load JSON
+              Load server list
             </button>
-            <p class="demo-status muted" id="demo-status" role="status"></p>
+            <p class="status-message muted" id="demo-status" role="status"></p>
           </div>
         </div>
       </section>
@@ -129,13 +129,28 @@
                   Download user_data.json
                 </span>
               </div>
-              <div class="tooltip-anchor" id="fetch-tooltip-anchor">
-                <button class="btn btn-secondary" id="btn-fetch" type="button">
-                  Fetch public info
-                </button>
-                <span class="tooltip-pill" id="fetch-tooltip" role="tooltip">
-                  Public widget fetch is disabled in demo mode.
-                </span>
+              <div class="fetch-container" id="fetch-container">
+                <div class="fetch-actions">
+                  <div class="tooltip-anchor" id="fetch-tooltip-anchor">
+                    <button class="btn btn-secondary" id="btn-fetch" type="button">
+                      Fetch public info
+                    </button>
+                    <span class="tooltip-pill" id="fetch-tooltip" role="tooltip">
+                      Public widget fetch is disabled in demo mode.
+                    </span>
+                  </div>
+                  <span class="fetch-last-run muted" id="fetch-last-run"></span>
+                </div>
+                <div class="fetch-progress hidden" id="fetch-progress-inline">
+                  <div class="fetch-progress-info">
+                    <span id="fetch-inline-text">Fetching...</span>
+                    <button class="btn btn-ghost btn-sm" id="fetch-inline-stop" type="button">Stop</button>
+                  </div>
+                  <div class="progress-bar">
+                    <div class="progress-bar-fill" id="fetch-inline-bar"></div>
+                  </div>
+                  <span class="muted" id="fetch-inline-detail"></span>
+                </div>
               </div>
             </div>
           </section>
@@ -367,36 +382,36 @@
             data-modal-close
             aria-label="Close"
           >
-            &times;
+            <span aria-hidden="true">&times;</span>
           </button>
         </header>
         <div class="modal-body">
-          <p id="import-copy">Choose what you want to import.</p>
+          <p id="import-copy">Import your Discord data. Start with your server list, then optionally restore your backup.</p>
           <div class="import-grid">
-            <div class="import-card">
+            <div class="import-card" id="import-guilds-card">
               <div class="import-card-header">
                 <span class="import-label is-required">Required</span>
                 <h4 class="import-card-title">Server List</h4>
                 <code class="import-filename">guilds_api.json</code>
               </div>
               <p class="import-card-desc" id="import-guilds-copy">
-                Your servers from the Discord API or a legacy export.
-                <a href="#" class="text-link" id="instructions-link">Instructions</a>
+                <button type="button" class="text-link" id="import-instructions-link">How to export from Discord</button>
               </p>
               <p class="import-card-meta" id="import-guilds-meta"></p>
               <label class="btn btn-primary btn-block import-card-action">
-                Load server list
+                Select server list
                 <input
                   class="sr-only"
                   id="import-guilds-input"
                   type="file"
                   accept="application/json"
+                  aria-describedby="import-guilds-meta"
                 />
               </label>
             </div>
-            <div class="import-card">
+            <div class="import-card" id="import-user-card">
               <div class="import-card-header">
-                <span class="import-label">Optional</span>
+                <span class="import-label" id="import-user-label">Optional</span>
                 <h4 class="import-card-title">User Data Backup</h4>
                 <code class="import-filename">user_data.json</code>
               </div>
@@ -405,17 +420,18 @@
               </p>
               <p class="import-card-meta" id="import-user-meta"></p>
               <label class="btn btn-secondary btn-block import-card-action">
-                Restore backup
+                Select backup file
                 <input
                   class="sr-only"
                   id="import-user-input"
                   type="file"
                   accept="application/json"
+                  aria-describedby="import-user-meta"
                 />
               </label>
             </div>
           </div>
-          <p class="demo-status muted" id="import-status" role="status"></p>
+          <p class="status-message muted" id="import-status" role="status"></p>
           <div class="modal-actions">
             <button class="btn btn-secondary" type="button" data-modal-close>
               Cancel
@@ -440,51 +456,29 @@
             data-modal-close
             aria-label="Close"
           >
-            &times;
+            <span aria-hidden="true">&times;</span>
           </button>
         </header>
         <div class="modal-body">
-          <div data-fetch-step="intro">
-            <p>
-              Fetch live widget data to capture online counts and invite links.
-            </p>
-            <ul>
-              <li>Presence count (shown as the green dot)</li>
-              <li>Public invite link when available</li>
-            </ul>
-            <p class="muted" id="fetch-skip-info"></p>
-            <label class="checkbox-row">
-              <input type="checkbox" id="fetch-force" />
-              <span>Clear cached results and refetch all servers</span>
-            </label>
-            <div class="modal-actions">
-              <button class="btn btn-primary" id="fetch-start" type="button">
-                Continue
-              </button>
-              <button class="btn btn-secondary" type="button" data-modal-close>
-                Cancel
-              </button>
-            </div>
-          </div>
-          <div class="hidden" data-fetch-step="progress">
-            <p id="fetch-progress-text">Fetching server info...</p>
-            <div class="progress-bar">
-              <div class="progress-bar-fill" id="fetch-progress-bar"></div>
-            </div>
-            <p class="muted" id="fetch-progress-detail"></p>
-            <div class="modal-actions">
-              <button class="btn btn-danger" id="fetch-stop" type="button">
-                Stop
-              </button>
-            </div>
-          </div>
-          <div class="hidden" data-fetch-step="complete">
-            <p id="fetch-complete-text"></p>
-            <div class="modal-actions">
-              <button class="btn btn-secondary" type="button" data-modal-close>
-                Close
-              </button>
-            </div>
+          <p>
+            Fetch live widget data to capture online counts and invite links.
+          </p>
+          <ul>
+            <li>Presence count (shown as the green dot)</li>
+            <li>Public invite link when available</li>
+          </ul>
+          <p class="muted" id="fetch-skip-info"></p>
+          <label class="checkbox-row">
+            <input type="checkbox" id="fetch-force" />
+            <span>Clear cached results and refetch all servers</span>
+          </label>
+          <div class="modal-actions">
+            <button class="btn btn-primary" id="fetch-start" type="button">
+              Start fetch
+            </button>
+            <button class="btn btn-secondary" type="button" data-modal-close>
+              Cancel
+            </button>
           </div>
         </div>
       </div>
@@ -505,10 +499,57 @@
             data-modal-close
             aria-label="Close"
           >
-            &times;
+            <span aria-hidden="true">&times;</span>
           </button>
         </header>
         <div class="modal-body" id="details-body"></div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="demo-modal" aria-hidden="true">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="demo-modal-title"
+      >
+        <header class="modal-header">
+          <h3 id="demo-modal-title">Load server list</h3>
+          <button
+            class="icon-button"
+            type="button"
+            data-modal-close
+            aria-label="Close"
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </header>
+        <div class="modal-body">
+          <p>Load your Discord server list to enter demo mode.</p>
+          <p class="muted">
+            Need help? <button type="button" class="text-link" id="demo-instructions-link">How to export from Discord</button>
+          </p>
+
+          <div class="demo-upload-section">
+            <label class="btn btn-primary btn-block">
+              Select server list
+              <input
+                class="sr-only"
+                id="demo-guilds-input"
+                type="file"
+                accept="application/json"
+                aria-describedby="demo-modal-status"
+              />
+            </label>
+            <p class="status-message muted" id="demo-modal-status" role="status"></p>
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn btn-secondary" type="button" data-modal-close>
+              Cancel
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -520,50 +561,39 @@
         aria-labelledby="instructions-title"
       >
         <header class="modal-header">
-          <h3 id="instructions-title">How to get guilds_api.json</h3>
+          <h3 id="instructions-title">How to export your server list</h3>
           <button
             class="icon-button"
             type="button"
             data-modal-close
             aria-label="Close"
           >
-            &times;
+            <span aria-hidden="true">&times;</span>
           </button>
         </header>
         <div class="modal-body">
-          <p>There are several ways to export your Discord server list:</p>
-
-          <h4>Option 1: Discord API (Recommended)</h4>
           <ol>
-            <li>Open Discord in your browser and log in</li>
-            <li>Open Developer Tools (F12 or Cmd+Opt+I)</li>
-            <li>Go to the Network tab</li>
-            <li>Filter by "guilds" or look for requests to the Discord API</li>
-            <li>Find a request to <code>/api/v9/users/@me/guilds</code></li>
-            <li>Copy the response JSON and save as <code>guilds_api.json</code></li>
+            <li>Open <a href="https://discord.com/app" target="_blank" rel="noopener" class="text-link">Discord in your browser</a> and log in</li>
+            <li>Open Developer Tools (F12 or Cmd+Option+I)</li>
+            <li>Go to the Console tab</li>
+            <li>Paste and run this code:</li>
           </ol>
-
-          <h4>Option 2: Browser Console</h4>
-          <ol>
-            <li>Open Discord in your browser</li>
-            <li>Open Developer Tools Console (F12, then Console tab)</li>
-            <li>Run the following code:</li>
-          </ol>
-          <pre class="code-block">fetch('/api/v9/users/@me/guilds')
+          <div class="code-block-wrapper">
+            <pre class="code-block" id="instructions-code-snippet" tabindex="0" aria-label="JavaScript code to export Discord servers">fetch('/api/v9/users/@me/guilds')
   .then(r => r.json())
   .then(d => {
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)]));
+    a.href = URL.createObjectURL(
+      new Blob([JSON.stringify(d, null, 2)])
+    );
     a.download = 'guilds_api.json';
     a.click();
   });</pre>
-
-          <h4>Option 3: Legacy Export</h4>
-          <p>
-            If you have a previous export from another Discord tool,
-            it may be compatible if it contains server data with
-            <code>id</code>, <code>name</code>, and <code>features</code> fields.
-          </p>
+            <button type="button" class="code-copy-btn" id="instructions-code-copy" aria-label="Copy code to clipboard">
+              <i class="fa-regular fa-copy" aria-hidden="true"></i>
+            </button>
+          </div>
+          <p class="muted">This will download <code>guilds_api.json</code> with your server list.</p>
 
           <div class="modal-actions">
             <button class="btn btn-secondary" type="button" data-modal-close>

@@ -32,6 +32,15 @@ export class AuthError extends Error {
   }
 }
 
+export class RateLimitError extends Error {
+  retryAfter: number | null;
+  constructor(retryAfter: number | null = null) {
+    super('Rate limited');
+    this.name = 'RateLimitError';
+    this.retryAfter = retryAfter;
+  }
+}
+
 const DEFAULT_HEADERS: HeadersInit = {
   Accept: 'application/json',
 };
@@ -50,6 +59,11 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
     throw new AuthError();
   }
 
+  if (response.status === 429) {
+    const retryAfter = response.headers.get('Retry-After');
+    throw new RateLimitError(retryAfter ? parseInt(retryAfter, 10) : null);
+  }
+
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status}`);
   }
@@ -57,12 +71,27 @@ async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T
   return (await response.json()) as T;
 }
 
-export function fetchMe(): Promise<ApiUser> {
-  return apiRequest<ApiUser>('/api/me');
+interface MeResponse {
+  authenticated: boolean;
+  user?: ApiUser;
+  reason?: string;
 }
 
-export function fetchGuilds(): Promise<ApiGuild[]> {
-  return apiRequest<ApiGuild[]>('/api/guilds');
+interface GuildsResponse {
+  guilds: ApiGuild[];
+}
+
+export async function fetchMe(): Promise<ApiUser> {
+  const response = await apiRequest<MeResponse>('/api/me');
+  if (!response.authenticated || !response.user) {
+    throw new AuthError(response.reason ?? 'Not authenticated');
+  }
+  return response.user;
+}
+
+export async function fetchGuilds(): Promise<ApiGuild[]> {
+  const response = await apiRequest<GuildsResponse>('/api/guilds');
+  return response.guilds;
 }
 
 export function fetchGuildMember(guildId: string): Promise<ApiGuildMember> {

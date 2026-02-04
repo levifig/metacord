@@ -14,6 +14,7 @@ import {
   deleteSession,
   getSessionCookieName,
   getSessionContext,
+  isSecureContext,
   persistSession,
   refreshSession,
 } from '../lib/session';
@@ -37,12 +38,17 @@ const OAUTH_STATE_COOKIE = 'oauth_state';
 const OAUTH_VERIFIER_COOKIE = 'oauth_verifier';
 const OAUTH_COOKIE_MAX_AGE = 600;
 
+function getOAuthCookieName(baseName: string, secure: boolean): string {
+  return secure ? `__Host-${baseName}` : baseName;
+}
+
 app.get('/api/health', () => jsonResponse({ ok: true }));
 
 app.get('/api/auth/login', async (c) => {
   const state = crypto.randomUUID();
   const verifier = createPkceVerifier();
   const challenge = await createPkceChallenge(verifier);
+  const secure = isSecureContext(c.req.raw);
 
   const params = new URLSearchParams({
     client_id: c.env.DISCORD_CLIENT_ID,
@@ -56,8 +62,8 @@ app.get('/api/auth/login', async (c) => {
 
   const headers = new Headers();
   headers.set('Location', `${DISCORD_OAUTH_URL}?${params.toString()}`);
-  headers.append('Set-Cookie', buildOAuthCookie(OAUTH_STATE_COOKIE, state));
-  headers.append('Set-Cookie', buildOAuthCookie(OAUTH_VERIFIER_COOKIE, verifier));
+  headers.append('Set-Cookie', buildOAuthCookie(getOAuthCookieName(OAUTH_STATE_COOKIE, secure), state, secure));
+  headers.append('Set-Cookie', buildOAuthCookie(getOAuthCookieName(OAUTH_VERIFIER_COOKIE, secure), verifier, secure));
 
   return new Response(null, { status: 302, headers });
 });
@@ -77,8 +83,9 @@ app.get('/api/auth/callback', async (c) => {
   }
 
   const cookies = parseCookies(c.req.header('Cookie'));
-  const savedState = cookies[OAUTH_STATE_COOKIE];
-  const verifier = cookies[OAUTH_VERIFIER_COOKIE];
+  const secure = isSecureContext(c.req.raw);
+  const savedState = cookies[getOAuthCookieName(OAUTH_STATE_COOKIE, secure)];
+  const verifier = cookies[getOAuthCookieName(OAUTH_VERIFIER_COOKIE, secure)];
 
   if (!savedState || !verifier || savedState !== state) {
     return errorResponse('Invalid state parameter', 400);
@@ -135,9 +142,9 @@ app.get('/api/auth/callback', async (c) => {
 
   const headers = new Headers();
   headers.set('Location', '/');
-  headers.append('Set-Cookie', buildSessionCookie(sessionId));
-  headers.append('Set-Cookie', clearOAuthCookie(OAUTH_STATE_COOKIE));
-  headers.append('Set-Cookie', clearOAuthCookie(OAUTH_VERIFIER_COOKIE));
+  headers.append('Set-Cookie', buildSessionCookie(sessionId, secure));
+  headers.append('Set-Cookie', clearOAuthCookie(getOAuthCookieName(OAUTH_STATE_COOKIE, secure), secure));
+  headers.append('Set-Cookie', clearOAuthCookie(getOAuthCookieName(OAUTH_VERIFIER_COOKIE, secure), secure));
 
   return new Response(null, { status: 302, headers });
 });
@@ -145,14 +152,15 @@ app.get('/api/auth/callback', async (c) => {
 type AppContext = Context<{ Bindings: Env }>;
 
 const logoutHandler = async (c: AppContext) => {
+  const secure = isSecureContext(c.req.raw);
   const cookies = parseCookies(c.req.header('Cookie'));
-  const sessionId = cookies[getSessionCookieName()];
+  const sessionId = cookies[getSessionCookieName(secure)];
   if (sessionId) {
     await deleteSession(sessionId, c.env);
   }
 
   const headers = new Headers();
-  headers.append('Set-Cookie', buildClearSessionCookie());
+  headers.append('Set-Cookie', buildClearSessionCookie(secure));
 
   if (c.req.method === 'GET') {
     headers.set('Location', '/');
@@ -181,12 +189,12 @@ app.get('/api/me', async (c) => {
   );
 
   if (!result.session) {
-    headers.append('Set-Cookie', buildClearSessionCookie());
+    headers.append('Set-Cookie', buildClearSessionCookie(sessionContext.secure));
     return jsonResponse({ authenticated: false, reason: 'invalid_token' }, 200, headers);
   }
 
   if (result.response.status === 401) {
-    headers.append('Set-Cookie', buildClearSessionCookie());
+    headers.append('Set-Cookie', buildClearSessionCookie(sessionContext.secure));
     return jsonResponse({ authenticated: false, reason: 'invalid_token' }, 200, headers);
   }
 
@@ -234,13 +242,13 @@ app.get('/api/guilds', async (c) => {
 
   if (!result.session) {
     const headers = new Headers();
-    headers.append('Set-Cookie', buildClearSessionCookie());
+    headers.append('Set-Cookie', buildClearSessionCookie(sessionContext.secure));
     return errorResponse('Unauthorized', 401, headers);
   }
 
   if (result.response.status === 401) {
     const headers = new Headers();
-    headers.append('Set-Cookie', buildClearSessionCookie());
+    headers.append('Set-Cookie', buildClearSessionCookie(sessionContext.secure));
     return errorResponse('Unauthorized', 401, headers);
   }
 
@@ -299,13 +307,13 @@ app.get('/api/guilds/:id', async (c) => {
 
   if (!result.session) {
     const headers = new Headers();
-    headers.append('Set-Cookie', buildClearSessionCookie());
+    headers.append('Set-Cookie', buildClearSessionCookie(sessionContext.secure));
     return errorResponse('Unauthorized', 401, headers);
   }
 
   if (result.response.status === 401) {
     const headers = new Headers();
-    headers.append('Set-Cookie', buildClearSessionCookie());
+    headers.append('Set-Cookie', buildClearSessionCookie(sessionContext.secure));
     return errorResponse('Unauthorized', 401, headers);
   }
 
@@ -347,55 +355,117 @@ app.get('/api/widget/:id', async (c) => {
   const cached = await getCachedResponse(cacheKey);
   if (cached) return cached;
 
-  const widgetResponse = await fetch(
-    `${DISCORD_API_BASE}/guilds/${guildId}/widget.json`
-  );
+  // Get the rate limiter DO stub (use a single instance for widget endpoint)
+  const rateLimiterId = c.env.DISCORD_RATE_LIMITER.idFromName('widget');
+  const rateLimiter = c.env.DISCORD_RATE_LIMITER.get(rateLimiterId);
 
-  if (!widgetResponse.ok) {
-    if (widgetResponse.status === 403 || widgetResponse.status === 404) {
-      return cachedJsonResponse(
-        c.executionCtx,
-        cacheKey,
-        { enabled: false, guild_id: guildId },
-        { ttlSeconds: 60, swrSeconds: 120, visibility: 'public' }
-      );
-    }
-    return errorResponse('Failed to fetch widget', 500);
+  // Acquire a rate limit slot
+  const slot = await rateLimiter.acquireSlot();
+  if (!slot.allowed) {
+    return c.json(
+      { error: slot.error || 'Rate limited', retryAfter: slot.waitMs ? Math.ceil(slot.waitMs / 1000) : null },
+      { status: 429, headers: slot.waitMs ? { 'Retry-After': String(Math.ceil(slot.waitMs / 1000)) } : {} }
+    );
   }
 
-  const widget = await widgetResponse.json();
-  return cachedJsonResponse(
-    c.executionCtx,
-    cacheKey,
-    {
-      enabled: true,
-      guild_id: guildId,
-      name: widget.name,
-      instant_invite: widget.instant_invite,
-      presence_count: widget.presence_count,
-      channels: widget.channels,
-    },
-    { ttlSeconds: 60, swrSeconds: 120, visibility: 'public' }
-  );
+  try {
+    const widgetResponse = await fetch(
+      `${DISCORD_API_BASE}/guilds/${guildId}/widget.json`
+    );
+
+    // Extract rate limit headers and update DO state
+    const rateLimitHeaders: Record<string, string | null> = {
+      'x-ratelimit-limit': widgetResponse.headers.get('x-ratelimit-limit'),
+      'x-ratelimit-remaining': widgetResponse.headers.get('x-ratelimit-remaining'),
+      'x-ratelimit-reset': widgetResponse.headers.get('x-ratelimit-reset'),
+      'x-ratelimit-reset-after': widgetResponse.headers.get('x-ratelimit-reset-after'),
+      'x-ratelimit-bucket': widgetResponse.headers.get('x-ratelimit-bucket'),
+      'x-ratelimit-global': widgetResponse.headers.get('x-ratelimit-global'),
+      'x-ratelimit-scope': widgetResponse.headers.get('x-ratelimit-scope'),
+    };
+    await rateLimiter.updateFromResponse(rateLimitHeaders);
+
+    if (!widgetResponse.ok) {
+      if (widgetResponse.status === 403 || widgetResponse.status === 404) {
+        return cachedJsonResponse(
+          c.executionCtx,
+          cacheKey,
+          { enabled: false, guild_id: guildId },
+          { ttlSeconds: 60, swrSeconds: 120, visibility: 'public' }
+        );
+      }
+      if (widgetResponse.status === 429) {
+        const retryAfterHeader = widgetResponse.headers.get('Retry-After');
+        let retryAfter: number | null = retryAfterHeader ? parseInt(retryAfterHeader, 10) : null;
+
+        // Also check JSON body for retry_after if header not present
+        if (retryAfter === null) {
+          try {
+            const body = await widgetResponse.json() as { retry_after?: number };
+            if (body.retry_after) {
+              retryAfter = Math.ceil(body.retry_after);
+            }
+          } catch {
+            // Ignore JSON parse errors
+          }
+        }
+
+        // Notify rate limiter about the 429
+        if (retryAfter !== null) {
+          await rateLimiter.handleRateLimited(retryAfter);
+        }
+
+        return c.json(
+          { error: 'Rate limited', retryAfter },
+          { status: 429, headers: retryAfter ? { 'Retry-After': String(retryAfter) } : {} }
+        );
+      }
+      return errorResponse('Failed to fetch widget', 500);
+    }
+
+    const widget = await widgetResponse.json() as {
+      name: string;
+      instant_invite: string | null;
+      presence_count: number;
+      channels: Array<{ id: string; name: string; position: number }>;
+    };
+    return cachedJsonResponse(
+      c.executionCtx,
+      cacheKey,
+      {
+        enabled: true,
+        guild_id: guildId,
+        name: widget.name,
+        instant_invite: widget.instant_invite,
+        presence_count: widget.presence_count,
+        channels: widget.channels,
+      },
+      { ttlSeconds: 60, swrSeconds: 120, visibility: 'public' }
+    );
+  } finally {
+    // Always release the slot when done
+    await rateLimiter.releaseSlot();
+  }
 });
 
 export const onRequest = app.fetch;
+export { app };
 
-function buildOAuthCookie(name: string, value: string): string {
+function buildOAuthCookie(name: string, value: string, secure: boolean = true): string {
   return serializeCookie(name, value, {
     path: '/',
     httpOnly: true,
-    secure: true,
+    secure: secure,
     sameSite: 'Lax',
     maxAge: OAUTH_COOKIE_MAX_AGE,
   });
 }
 
-function clearOAuthCookie(name: string): string {
+function clearOAuthCookie(name: string, secure: boolean = true): string {
   return serializeCookie(name, '', {
     path: '/',
     httpOnly: true,
-    secure: true,
+    secure: secure,
     sameSite: 'Lax',
     maxAge: 0,
   });

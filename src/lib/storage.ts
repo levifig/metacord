@@ -10,6 +10,7 @@ export interface UserDataStore {
   nicknames: Record<string, string>;
   notes: Record<string, string>;
   widgetCache: Record<string, WidgetCacheEntry>;
+  lastFetchTimestamp: string | null;
 }
 
 interface StorageOptions {
@@ -24,6 +25,7 @@ export const createDefaultUserData = (): UserDataStore => ({
   nicknames: {},
   notes: {},
   widgetCache: {},
+  lastFetchTimestamp: null,
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -74,6 +76,7 @@ export const loadUserData = (options?: StorageOptions): UserDataStore => {
       nicknames: toStringRecord(parsed.nicknames),
       notes: toStringRecord(parsed.notes),
       widgetCache: toWidgetCache(parsed.widgetCache),
+      lastFetchTimestamp: typeof parsed.lastFetchTimestamp === 'string' ? parsed.lastFetchTimestamp : null,
     };
   } catch (error) {
     console.error('Failed to load user data', error);
@@ -158,6 +161,16 @@ export const clearWidgetCache = (data: UserDataStore, options?: StorageOptions):
   return next;
 };
 
+export const updateLastFetchTimestamp = (
+  data: UserDataStore,
+  timestamp: string | null,
+  options?: StorageOptions,
+): UserDataStore => {
+  const next = { ...data, lastFetchTimestamp: timestamp };
+  saveUserData(next, options);
+  return next;
+};
+
 export const exportUserData = (data: UserDataStore): string => {
   return JSON.stringify(data, null, 2);
 };
@@ -169,6 +182,8 @@ const isValidUserData = (value: unknown): value is UserDataStore => {
   if (!isRecord(value.nicknames)) return false;
   if (!isRecord(value.notes)) return false;
   if (!isRecord(value.widgetCache)) return false;
+  // lastFetchTimestamp is optional for backwards compatibility
+  if (value.lastFetchTimestamp !== undefined && value.lastFetchTimestamp !== null && typeof value.lastFetchTimestamp !== 'string') return false;
   return true;
 };
 
@@ -183,6 +198,7 @@ export const importUserData = (raw: unknown, options?: StorageOptions): UserData
     nicknames: toStringRecord(raw.nicknames),
     notes: toStringRecord(raw.notes),
     widgetCache: toWidgetCache(raw.widgetCache),
+    lastFetchTimestamp: typeof raw.lastFetchTimestamp === 'string' ? raw.lastFetchTimestamp : null,
   };
   saveUserData(sanitized, options);
   return sanitized;

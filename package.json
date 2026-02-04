@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "concurrently -k \"pnpm run dev:ui\" \"pnpm run dev:api\"",
     "dev:ui": "vite",
-    "dev:api": "wrangler pages dev ./src --proxy 5173 --kv=SESSIONS",
+    "dev:api": "wrangler dev --env development",
     "build": "vite build",
-    "preview": "wrangler pages dev ./dist --kv=SESSIONS",
-    "deploy": "pnpm run build && wrangler pages deploy ./dist",
+    "preview": "pnpm run build && wrangler dev --env development",
+    "deploy": "pnpm run build && wrangler deploy --env=production",
+    "deploy:prod": "pnpm run build && wrangler deploy --env=production",
+    "deploy:dev": "pnpm run build && wrangler deploy --env=development",
     "types": "wrangler types"
   },
   "dependencies": {
