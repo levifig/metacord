@@ -34,7 +34,7 @@
               target="_blank"
               rel="noopener"
             >
-              Privacy / FAQ
+              Privacy / FAQ<span class="sr-only"> (opens in new window)</span>
             </a>
           </div>
           <div class="demo-loader hidden" id="demo-loader" aria-live="polite">
@@ -52,7 +52,7 @@
         </div>
       </section>
 
-      <div id="error-screen" class="error-screen hidden" aria-hidden="true">
+      <div id="error-screen" class="error-screen hidden" aria-hidden="true" role="alert">
         <div class="error-content">
           <h2>Something went wrong</h2>
           <p class="muted">An unexpected error occurred. Try reloading the page.</p>
@@ -61,7 +61,7 @@
       </div>
 
       <section class="app-shell hidden" id="app-shell" aria-hidden="true">
-        <div class="container">
+        <main class="container">
           <header class="app-header" data-animate style="--delay: 0ms">
             <div class="header-top">
               <div class="header-brand">
@@ -359,7 +359,7 @@
                 ><span id="footer-year">YYYY</span> ALL RIGHTS RESERVED</span
               >
             </div>
-            <div class="footer-links" aria-label="Social links">
+            <nav class="footer-links" aria-label="Social links">
               <a
                 class="footer-link"
                 href="https://github.com/levifig/metacord"
@@ -378,11 +378,11 @@
                 <i class="fa-brands fa-x-twitter" aria-hidden="true"></i>
                 <span class="sr-only">Follow me on Twitter/X</span>
               </a>
-            </div>
+            </nav>
 
             <p class="footer-build" id="footer-build"></p>
           </footer>
-        </div>
+        </main>
       </section>
     </div>
 

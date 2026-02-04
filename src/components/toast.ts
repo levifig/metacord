@@ -14,6 +14,7 @@ export const createToastManager = (container: HTMLElement): ToastManager => {
     const toast = document.createElement('div');
     const variant = options.variant ?? 'success';
     toast.className = `toast ${variant}`;
+    toast.setAttribute('role', variant === 'error' ? 'alert' : 'status');
     toast.textContent = message;
     container.appendChild(toast);
     const duration = options.duration ?? 3000;
