@@ -261,6 +261,19 @@ export const render = (): void => {
 
   emptyState.classList.toggle('hidden', allViews.length > 0);
   searchHelper.classList.toggle('hidden', state.search.trim().length > 0);
+
+  // Update filter count badge
+  const filterCount = document.getElementById('filter-count');
+  if (filterCount) {
+    const hasActiveFilters = state.activeFilters.size > 0 || state.search.trim().length > 0;
+    if (hasActiveFilters && allViews.length > 0) {
+      filterCount.textContent = `${filtered.length} of ${allViews.length} servers`;
+      filterCount.classList.remove('hidden');
+    } else {
+      filterCount.textContent = '';
+      filterCount.classList.add('hidden');
+    }
+  }
 };
 
 // --- Details modal ---

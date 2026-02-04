@@ -603,6 +603,13 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+.filter-count {
+  font-size: var(--text-xs);
+  color: var(--color-text-dim);
+  margin-left: var(--space-2);
+  white-space: nowrap;
+}
+
 .sort-control {
   display: flex;
   align-items: center;
