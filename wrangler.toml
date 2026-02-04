@@ -31,7 +31,7 @@ new_classes = ["DiscordRateLimiter"]
 # Worker name: metacord-prod
 # Custom domain: metacord.app
 # Deploy with: pnpm run deploy
-name = "metacord-dev"
+name = "metacord-prod"
 kv_namespaces = [
   { binding = "SESSIONS", id = "89d6fd289f654bfc802fc9a3eb2e4cd6" }
 ]

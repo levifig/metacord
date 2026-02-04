@@ -10,6 +10,7 @@ dist/
 .pnpm-store/
 .DS_Store
 *.log
+*.har
 tmp/
 guilds_api.json
 servers_data.json
