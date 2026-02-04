@@ -38,6 +38,10 @@ const OAUTH_STATE_COOKIE = 'oauth_state';
 const OAUTH_VERIFIER_COOKIE = 'oauth_verifier';
 const OAUTH_COOKIE_MAX_AGE = 600;
 
+function getOAuthCookieName(baseName: string, secure: boolean): string {
+  return secure ? `__Host-${baseName}` : baseName;
+}
+
 app.get('/api/health', () => jsonResponse({ ok: true }));
 
 app.get('/api/auth/login', async (c) => {
@@ -58,8 +62,8 @@ app.get('/api/auth/login', async (c) => {
 
   const headers = new Headers();
   headers.set('Location', `${DISCORD_OAUTH_URL}?${params.toString()}`);
-  headers.append('Set-Cookie', buildOAuthCookie(OAUTH_STATE_COOKIE, state, secure));
-  headers.append('Set-Cookie', buildOAuthCookie(OAUTH_VERIFIER_COOKIE, verifier, secure));
+  headers.append('Set-Cookie', buildOAuthCookie(getOAuthCookieName(OAUTH_STATE_COOKIE, secure), state, secure));
+  headers.append('Set-Cookie', buildOAuthCookie(getOAuthCookieName(OAUTH_VERIFIER_COOKIE, secure), verifier, secure));
 
   return new Response(null, { status: 302, headers });
 });
@@ -79,8 +83,9 @@ app.get('/api/auth/callback', async (c) => {
   }
 
   const cookies = parseCookies(c.req.header('Cookie'));
-  const savedState = cookies[OAUTH_STATE_COOKIE];
-  const verifier = cookies[OAUTH_VERIFIER_COOKIE];
+  const secure = isSecureContext(c.req.raw);
+  const savedState = cookies[getOAuthCookieName(OAUTH_STATE_COOKIE, secure)];
+  const verifier = cookies[getOAuthCookieName(OAUTH_VERIFIER_COOKIE, secure)];
 
   if (!savedState || !verifier || savedState !== state) {
     return errorResponse('Invalid state parameter', 400);
@@ -122,7 +127,6 @@ app.get('/api/auth/callback', async (c) => {
   const user: DiscordUser = await userResponse.json();
   const sessionId = crypto.randomUUID();
   const now = Date.now();
-  const secure = isSecureContext(c.req.raw);
 
   await persistSession(
     sessionId,
@@ -139,8 +143,8 @@ app.get('/api/auth/callback', async (c) => {
   const headers = new Headers();
   headers.set('Location', '/');
   headers.append('Set-Cookie', buildSessionCookie(sessionId, secure));
-  headers.append('Set-Cookie', clearOAuthCookie(OAUTH_STATE_COOKIE, secure));
-  headers.append('Set-Cookie', clearOAuthCookie(OAUTH_VERIFIER_COOKIE, secure));
+  headers.append('Set-Cookie', clearOAuthCookie(getOAuthCookieName(OAUTH_STATE_COOKIE, secure), secure));
+  headers.append('Set-Cookie', clearOAuthCookie(getOAuthCookieName(OAUTH_VERIFIER_COOKIE, secure), secure));
 
   return new Response(null, { status: 302, headers });
 });

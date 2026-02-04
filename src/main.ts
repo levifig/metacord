@@ -416,8 +416,8 @@ const renderSection = (key: string, servers: ServerView[]): void => {
 };
 
 const render = (): void => {
-  const servers = buildServerViews();
-  const filtered = servers.filter((server) =>
+  const allViews = buildServerViews();
+  const filtered = allViews.filter((server) =>
     matchesFilter(server, state.activeFilters) && matchesSearch(server, state.search.trim()),
   );
 
@@ -435,7 +435,6 @@ const render = (): void => {
   renderSection('public', publicServers);
   renderSection('private', privateServers);
 
-  const allViews = buildServerViews();
   const favoritesTotal = allViews.filter((server) => server.isFavorite).length;
   const ownedTotal = allViews.filter((server) => server.owner).length;
   const publicTotal = allViews.filter((server) => server.widget?.instantInvite).length;

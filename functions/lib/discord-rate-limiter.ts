@@ -129,17 +129,17 @@ export class DiscordRateLimiter extends DurableObject {
    * Process the queue after a slot becomes available.
    */
   private processQueue(): void {
-    if (this.queue.length === 0) return;
+    while (this.queue.length > 0) {
+      const effectiveRemaining = this.getEffectiveRemaining();
+      if (effectiveRemaining <= 0) break;
 
-    const effectiveRemaining = this.getEffectiveRemaining();
-    if (effectiveRemaining <= 0) return;
+      const next = this.queue.shift();
+      if (!next) break;
 
-    const next = this.queue.shift();
-    if (!next) return;
-
-    clearTimeout(next.timeout);
-    this.activeRequests++;
-    next.resolve({ allowed: true, queueId: next.id });
+      clearTimeout(next.timeout);
+      this.activeRequests++;
+      next.resolve({ allowed: true, queueId: next.id });
+    }
   }
 
   /**
