@@ -12,17 +12,27 @@
     "deploy": "pnpm run build && wrangler deploy --env=production",
     "deploy:prod": "pnpm run build && wrangler deploy --env=production",
     "deploy:dev": "pnpm run build && wrangler deploy --env=development",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "types": "wrangler types"
   },
   "dependencies": {
     "hono": "^4.11.4"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.9",
     "@cloudflare/workers-types": "^4.20260118.0",
     "@types/node": "^20.19.30",
     "concurrently": "^8.2.2",
+    "happy-dom": "^20.5.0",
     "typescript": "^5.9.3",
     "vite": "^5.4.21",
+    "vitest": "^3.2.4",
     "wrangler": "^4.59.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "workerd"
+    ]
   }
 }
