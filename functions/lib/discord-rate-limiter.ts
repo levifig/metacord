@@ -64,7 +64,7 @@ export class DiscordRateLimiter extends DurableObject {
   private queue: QueuedRequest[] = [];
   private activeRequests = 0;
 
-  constructor(ctx: DurableObjectState, env: unknown) {
+  constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.rateLimitState = this.getDefaultState();
   }

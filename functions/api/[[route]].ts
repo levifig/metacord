@@ -82,7 +82,7 @@ app.get('/api/auth/callback', async (c) => {
     return errorResponse('Missing code or state parameter', 400);
   }
 
-  const cookies = parseCookies(c.req.header('Cookie'));
+  const cookies = parseCookies(c.req.header('Cookie') ?? null);
   const secure = isSecureContext(c.req.raw);
   const savedState = cookies[getOAuthCookieName(OAUTH_STATE_COOKIE, secure)];
   const verifier = cookies[getOAuthCookieName(OAUTH_VERIFIER_COOKIE, secure)];
@@ -153,7 +153,7 @@ type AppContext = Context<{ Bindings: Env }>;
 
 const logoutHandler = async (c: AppContext) => {
   const secure = isSecureContext(c.req.raw);
-  const cookies = parseCookies(c.req.header('Cookie'));
+  const cookies = parseCookies(c.req.header('Cookie') ?? null);
   const sessionId = cookies[getSessionCookieName(secure)];
   if (sessionId) {
     await deleteSession(sessionId, c.env);
