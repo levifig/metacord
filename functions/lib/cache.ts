@@ -5,6 +5,11 @@ export interface CacheOptions {
   sessionCookie?: string;
 }
 
+/** Minimal context type requiring only waitUntil (compatible with both Hono and Cloudflare ExecutionContext). */
+interface WaitUntilContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
 export function buildUserCacheKey(request: Request, userId: string): Request {
   const url = new URL(request.url);
   url.searchParams.set('__cacheUser', userId);
@@ -25,7 +30,7 @@ export async function getCachedResponse(
 }
 
 export async function cachedJsonResponse(
-  executionCtx: ExecutionContext,
+  executionCtx: WaitUntilContext,
   cacheKey: Request,
   data: unknown,
   options: CacheOptions,

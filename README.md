@@ -1,5 +1,7 @@
 # Metacord - Your Personal Discord Server Directory
 
+[![CI](https://github.com/levifig/metacord/actions/workflows/ci.yml/badge.svg)](https://github.com/levifig/metacord/actions/workflows/ci.yml)
+
 Metacord is a personal Discord server directory, allowing to keep track of current (and previous) servers, adding notes, keeping track of invite links (so you can leave and rejoin later), etc...
 
 ## Features

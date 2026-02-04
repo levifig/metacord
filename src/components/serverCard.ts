@@ -123,7 +123,9 @@ export const createServerCard = (server: ServerView, handlers: ServerCardHandler
   if (server.widget?.presenceCount) {
     const meta = createElement('div', 'server-meta');
     const online = createElement('span', 'online-count');
+    online.setAttribute('aria-label', `${formatNumber(server.widget.presenceCount)} online`);
     const dot = createElement('span', 'online-dot');
+    dot.setAttribute('aria-hidden', 'true');
     online.appendChild(dot);
     online.appendChild(document.createTextNode(formatNumber(server.widget.presenceCount)));
     meta.appendChild(online);

@@ -34,7 +34,7 @@
               target="_blank"
               rel="noopener"
             >
-              Privacy / FAQ
+              Privacy / FAQ<span class="sr-only"> (opens in new window)</span>
             </a>
           </div>
           <div class="demo-loader hidden" id="demo-loader" aria-live="polite">
@@ -52,8 +52,16 @@
         </div>
       </section>
 
+      <div id="error-screen" class="error-screen hidden" aria-hidden="true" role="alert">
+        <div class="error-content">
+          <h2>Something went wrong</h2>
+          <p class="muted">An unexpected error occurred. Try reloading the page.</p>
+          <button class="btn btn-primary" onclick="window.location.reload()">Reload</button>
+        </div>
+      </div>
+
       <section class="app-shell hidden" id="app-shell" aria-hidden="true">
-        <div class="container">
+        <main class="container">
           <header class="app-header" data-animate style="--delay: 0ms">
             <div class="header-top">
               <div class="header-brand">
@@ -201,17 +209,28 @@
               <button class="filter-clear hidden" type="button" id="filter-clear">
                 Clear
               </button>
+              <span id="filter-count" class="filter-count hidden" aria-live="polite"></span>
             </div>
-            <div class="filter-search">
-              <label class="sr-only" for="search-input">Search servers</label>
-              <input
-                class="search-input"
-                id="search-input"
-                type="search"
-                placeholder="Search by name or nickname"
-                autocomplete="off"
-              />
-              <span class="sr-only" id="search-helper" aria-live="polite"></span>
+            <div class="filter-controls">
+              <div class="sort-control">
+                <label for="sort-select" class="sr-only">Sort servers</label>
+                <select id="sort-select" class="sort-select">
+                  <option value="name-asc">Name (A-Z)</option>
+                  <option value="name-desc">Name (Z-A)</option>
+                  <option value="online-desc">Online ↓</option>
+                </select>
+              </div>
+              <div class="filter-search">
+                <label class="sr-only" for="search-input">Search servers</label>
+                <input
+                  class="search-input"
+                  id="search-input"
+                  type="search"
+                  placeholder="Search by name or nickname"
+                  autocomplete="off"
+                />
+                <span class="sr-only" id="search-helper" aria-live="polite"></span>
+              </div>
             </div>
           </section>
 
@@ -340,7 +359,7 @@
                 ><span id="footer-year">YYYY</span> ALL RIGHTS RESERVED</span
               >
             </div>
-            <div class="footer-links" aria-label="Social links">
+            <nav class="footer-links" aria-label="Social links">
               <a
                 class="footer-link"
                 href="https://github.com/levifig/metacord"
@@ -359,11 +378,11 @@
                 <i class="fa-brands fa-x-twitter" aria-hidden="true"></i>
                 <span class="sr-only">Follow me on Twitter/X</span>
               </a>
-            </div>
+            </nav>
 
             <p class="footer-build" id="footer-build"></p>
           </footer>
-        </div>
+        </main>
       </section>
     </div>
 

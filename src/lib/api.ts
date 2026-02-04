@@ -1,29 +1,22 @@
-export interface ApiUser {
-  id: string;
-  username: string;
+import type { DiscordGuild, DiscordUser, WidgetData } from '../../shared/types';
+
+/** User info returned by the /api/me endpoint */
+export type ApiUser = Pick<DiscordUser, 'id' | 'username' | 'avatar'>;
+
+/** Guild object returned by the /api/guilds endpoint */
+export type ApiGuild = DiscordGuild;
+
+/** Member info returned by the /api/guilds/:id endpoint */
+export interface ApiGuildMember {
+  guild_id: string;
+  joined_at?: string | null;
+  roles?: string[];
+  nickname?: string | null;
   avatar?: string | null;
 }
 
-export interface ApiGuild {
-  id: string;
-  name: string;
-  icon?: string | null;
-  banner?: string | null;
-  owner: boolean;
-  features: string[];
-}
-
-export interface ApiGuildMember {
-  id: string;
-  joined_at?: string | null;
-  roles?: string[];
-  nick?: string | null;
-}
-
-export interface ApiWidget {
-  instant_invite: string | null;
-  presence_count: number | null;
-}
+/** Widget data returned by the /api/widget/:id endpoint */
+export type ApiWidget = WidgetData;
 
 export class AuthError extends Error {
   constructor(message = 'Unauthorized') {
