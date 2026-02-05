@@ -6,19 +6,26 @@ import {
   toggleFavorite,
   updateNickname,
   updateNotes,
+  assignServerToCategory,
   type WidgetCacheEntry,
 } from './storage';
-import { createServerCard, type ServerView } from '../components/serverCard';
+import { createServerCard, type ServerView, type ServerCardOptions } from '../components/serverCard';
 import type { ModalController } from '../components/modal';
 import type { ToastManager } from '../components/toast';
 import { createElement, getIconUrl } from './utils';
 import { fetchGuildMember } from './api';
 import {
+  type DynamicSectionKey,
   type FilterKey,
   type SortKey,
+  type SectionElements,
+  collapsedSections,
   getElement,
   getSections,
   isDemoMode,
+  registerDynamicSection,
+  clearDynamicSections,
+  saveCollapsedSections,
   state,
   storageOptions,
 } from './state';
@@ -193,9 +200,27 @@ export const initDetailsModal = (modal: ModalController): void => {
   _detailsModal = modal;
 };
 
+export const getVisibleServerIds = (): string[] => {
+  const allViews = buildServerViews();
+  const filtered = allViews.filter((server) =>
+    matchesFilter(server, state.activeFilters) && matchesSearch(server, state.search.trim()),
+  );
+  return filtered.map((s) => s.id);
+};
+
+export const toggleSelection = (guildId: string): void => {
+  if (state.selectedIds.has(guildId)) {
+    state.selectedIds.delete(guildId);
+  } else {
+    state.selectedIds.add(guildId);
+  }
+  render();
+};
+
 const renderSection = (key: string, servers: ServerView[]): void => {
   const sections = getSections();
   const section = sections[key];
+  if (!section) return;
   section.list.replaceChildren();
   section.count.textContent = `${servers.length}`;
   if (servers.length === 0) {
@@ -204,6 +229,9 @@ const renderSection = (key: string, servers: ServerView[]): void => {
   }
   section.section.classList.remove('hidden');
   servers.forEach((server) => {
+    const cardOptions: ServerCardOptions | undefined = state.selectionMode
+      ? { selectionMode: true, isSelected: state.selectedIds.has(server.id) }
+      : undefined;
     section.list.appendChild(
       createServerCard(server, {
         onToggleFavorite: (guildId) => {
@@ -216,9 +244,65 @@ const renderSection = (key: string, servers: ServerView[]): void => {
           render();
         },
         onOpenDetails: (guildId) => openDetails(guildId),
-      }),
+        onToggleSelection: (guildId) => toggleSelection(guildId),
+      }, cardOptions),
     );
   });
+};
+
+// --- Dynamic category section creation ---
+
+const createCategorySectionDOM = (categoryId: string, categoryName: string): SectionElements => {
+  const sectionKey: DynamicSectionKey = `category-${categoryId}`;
+  const section = createElement('section', 'section hidden');
+  section.id = `${sectionKey}-section`;
+  section.setAttribute('data-animate', '');
+
+  const header = document.createElement('button');
+  header.className = 'section-header';
+  header.type = 'button';
+  header.dataset.collapseToggle = sectionKey;
+  const isCollapsed = collapsedSections.has(sectionKey);
+  header.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+  header.setAttribute('aria-controls', `${sectionKey}-content`);
+
+  const headerLeft = createElement('div', 'section-header-left');
+  const chevron = createElement('span', 'section-chevron');
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.innerHTML = '&#9662;';
+  const h2 = createElement('h2', '', categoryName);
+  headerLeft.append(chevron, h2);
+
+  const countPill = createElement('span', 'count-pill');
+  countPill.id = `${sectionKey}-count`;
+  countPill.textContent = '0';
+
+  header.append(headerLeft, countPill);
+  header.addEventListener('click', () => {
+    const expanded = header.getAttribute('aria-expanded') === 'true';
+    header.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    content.classList.toggle('is-collapsed', expanded);
+    if (expanded) {
+      collapsedSections.add(sectionKey);
+    } else {
+      collapsedSections.delete(sectionKey);
+    }
+    saveCollapsedSections(collapsedSections);
+  });
+
+  const content = createElement('div', 'section-content');
+  content.id = `${sectionKey}-content`;
+  if (isCollapsed) {
+    content.classList.add('is-collapsed');
+  }
+
+  const list = createElement('div', 'server-grid server-grid--constrained');
+  list.id = `${sectionKey}-list`;
+  content.appendChild(list);
+
+  section.append(header, content);
+
+  return { section, list, count: countPill, content, header };
 };
 
 // --- Main render ---
@@ -231,13 +315,43 @@ export const render = (): void => {
 
   const comparator = getSortComparator(state.sort);
   const favorites = filtered.filter((server) => server.isFavorite).sort(comparator);
-  const owned = filtered.filter((server) => server.owner && !server.isFavorite).sort(comparator);
-  const publicServers = filtered
-    .filter((server) => !server.owner && !server.isFavorite && Boolean(server.widget?.instantInvite))
-    .sort(comparator);
-  const privateServers = filtered
-    .filter((server) => !server.owner && !server.isFavorite && !server.widget?.instantInvite)
-    .sort(comparator);
+
+  // Build set of servers in custom categories (excluding favorites — favorites take priority)
+  const categorizedIds = new Set<string>();
+  const sortedCategories = [...state.userData.categories].sort((a, b) => a.order - b.order);
+
+  // Remove old dynamic category sections from DOM and state registry
+  const categoryContainer = document.getElementById('category-sections-container');
+  if (categoryContainer) {
+    categoryContainer.replaceChildren();
+  }
+  clearDynamicSections();
+
+  // Render each category section
+  for (const category of sortedCategories) {
+    const sectionKey: DynamicSectionKey = `category-${category.id}`;
+    const categoryServers = filtered.filter((server) => {
+      if (server.isFavorite) return false;
+      return state.userData.serverCategories[server.id] === category.id;
+    }).sort(comparator);
+
+    categoryServers.forEach((s) => categorizedIds.add(s.id));
+
+    const elements = createCategorySectionDOM(category.id, category.name);
+    registerDynamicSection(sectionKey, elements);
+    categoryContainer?.appendChild(elements.section);
+    renderSection(sectionKey, categoryServers);
+  }
+
+  const owned = filtered.filter((server) =>
+    server.owner && !server.isFavorite && !categorizedIds.has(server.id),
+  ).sort(comparator);
+  const publicServers = filtered.filter((server) =>
+    !server.owner && !server.isFavorite && !categorizedIds.has(server.id) && Boolean(server.widget?.instantInvite),
+  ).sort(comparator);
+  const privateServers = filtered.filter((server) =>
+    !server.owner && !server.isFavorite && !categorizedIds.has(server.id) && !server.widget?.instantInvite,
+  ).sort(comparator);
 
   renderSection('favorites', favorites);
   renderSection('owned', owned);
@@ -273,6 +387,25 @@ export const render = (): void => {
       filterCount.textContent = '';
       filterCount.classList.add('hidden');
     }
+  }
+
+  // Update bulk action bar
+  const bulkActions = document.getElementById('bulk-actions');
+  const bulkCount = document.getElementById('bulk-count');
+  const selectToggle = document.getElementById('btn-select-toggle');
+  if (bulkActions && bulkCount) {
+    const selectedCount = state.selectedIds.size;
+    if (state.selectionMode && selectedCount > 0) {
+      bulkActions.classList.remove('hidden');
+      bulkCount.textContent = `${selectedCount} selected`;
+    } else {
+      bulkActions.classList.add('hidden');
+      bulkCount.textContent = '';
+    }
+  }
+  if (selectToggle) {
+    selectToggle.classList.toggle('is-active', state.selectionMode);
+    selectToggle.setAttribute('aria-pressed', state.selectionMode ? 'true' : 'false');
   }
 };
 
@@ -346,6 +479,44 @@ export const openDetails = async (guildId: string): Promise<void> => {
   meta.appendChild(createElement('div', 'detail-row', widgetStatus));
   detailsBody.appendChild(meta);
 
+  const roles = member?.roles ?? [];
+  const rolesSection = createElement('div', 'roles-section');
+  const rolesHeader = createElement('div', 'roles-header');
+  const rolesLabel = createElement('span', 'roles-label', `Roles (${roles.length})`);
+  rolesHeader.appendChild(rolesLabel);
+  rolesSection.appendChild(rolesHeader);
+
+  if (roles.length > 0) {
+    const rolesList = createElement('div', 'roles-list');
+    rolesList.setAttribute('role', 'list');
+    rolesList.setAttribute('aria-label', 'Role IDs');
+    for (const roleId of roles) {
+      const item = createElement('div');
+      item.setAttribute('role', 'listitem');
+      const badge = createElement('button', 'role-badge');
+      badge.type = 'button';
+      badge.textContent = roleId;
+      badge.setAttribute('aria-label', `Role ID ${roleId}, click to copy`);
+      badge.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(roleId);
+          showToast('Role ID copied');
+        } catch {
+          showToast('Unable to copy role ID', { variant: 'error' });
+        }
+      });
+      item.appendChild(badge);
+      rolesList.appendChild(item);
+    }
+    rolesSection.appendChild(rolesList);
+    const rolesNote = createElement('p', 'roles-note muted', 'Role names require bot permissions \u2014 showing role IDs');
+    rolesSection.appendChild(rolesNote);
+  } else {
+    const noRoles = createElement('p', 'muted', 'No roles');
+    rolesSection.appendChild(noRoles);
+  }
+  detailsBody.appendChild(rolesSection);
+
   const nicknameField = createElement('div', 'form-field');
   const nicknameLabel = createElement('label', '', 'Nickname');
   nicknameLabel.setAttribute('for', 'nickname-input');
@@ -365,12 +536,38 @@ export const openDetails = async (guildId: string): Promise<void> => {
   notesField.append(notesLabel, notesInput);
   detailsBody.appendChild(notesField);
 
+  // Category assignment dropdown
+  const categoryField = createElement('div', 'form-field');
+  const categoryLabel = createElement('label', '', 'Category');
+  categoryLabel.setAttribute('for', 'category-select');
+  const categorySelect = document.createElement('select');
+  categorySelect.id = 'category-select';
+  categorySelect.className = 'sort-select';
+
+  const noneOption = document.createElement('option');
+  noneOption.value = '';
+  noneOption.textContent = 'None';
+  categorySelect.appendChild(noneOption);
+
+  const sortedCats = [...state.userData.categories].sort((a, b) => a.order - b.order);
+  for (const cat of sortedCats) {
+    const opt = document.createElement('option');
+    opt.value = cat.id;
+    opt.textContent = cat.name;
+    categorySelect.appendChild(opt);
+  }
+  categorySelect.value = state.userData.serverCategories[guildId] ?? '';
+  categoryField.append(categoryLabel, categorySelect);
+  detailsBody.appendChild(categoryField);
+
   const actions = createElement('div', 'modal-actions');
   const saveButton = createElement('button', 'btn btn-primary', 'Save');
   saveButton.type = 'button';
   saveButton.addEventListener('click', () => {
     state.userData = updateNickname(state.userData, guildId, nicknameInput.value, storageOptions);
     state.userData = updateNotes(state.userData, guildId, notesInput.value, storageOptions);
+    const selectedCategory = categorySelect.value || null;
+    state.userData = assignServerToCategory(state.userData, guildId, selectedCategory, storageOptions);
     showToast('Details saved');
     render();
     _detailsModal?.close();

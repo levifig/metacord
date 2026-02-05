@@ -18,19 +18,35 @@ export interface ServerView {
   widget?: ServerWidgetView | null;
 }
 
+export interface ServerCardOptions {
+  selectionMode?: boolean;
+  isSelected?: boolean;
+}
+
 export interface ServerCardHandlers {
   onToggleFavorite: (guildId: string) => void;
   onOpenDetails: (guildId: string) => void;
+  onToggleSelection?: (guildId: string) => void;
 }
 
 const hasBoost = (features: string[]): boolean =>
   features.includes('ANIMATED_ICON') || features.includes('ANIMATED_BANNER');
 
-export const createServerCard = (server: ServerView, handlers: ServerCardHandlers): HTMLElement => {
+export const createServerCard = (
+  server: ServerView,
+  handlers: ServerCardHandlers,
+  options?: ServerCardOptions,
+): HTMLElement => {
   const card = createElement('article', 'server-card');
   card.tabIndex = 0;
-  card.setAttribute('role', 'button');
-  card.setAttribute('aria-label', `Open details for ${server.nickname ?? server.name}`);
+  if (options?.selectionMode) {
+    card.setAttribute('role', 'checkbox');
+    card.setAttribute('aria-checked', options.isSelected ? 'true' : 'false');
+    card.setAttribute('aria-label', `Select ${server.nickname ?? server.name}`);
+  } else {
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `Open details for ${server.nickname ?? server.name}`);
+  }
   card.dataset.guildId = server.id;
 
   if (server.owner) {
@@ -38,6 +54,32 @@ export const createServerCard = (server: ServerView, handlers: ServerCardHandler
   }
   if (server.isFavorite) {
     card.classList.add('is-favorite');
+  }
+
+  if (options?.selectionMode) {
+    card.classList.add('is-selectable');
+    if (options.isSelected) {
+      card.classList.add('is-selected');
+    }
+
+    const checkbox = createElement('div', 'card-checkbox');
+    checkbox.setAttribute('role', 'checkbox');
+    checkbox.setAttribute('aria-checked', options.isSelected ? 'true' : 'false');
+    checkbox.setAttribute('aria-label', `Select ${server.nickname ?? server.name}`);
+    checkbox.tabIndex = 0;
+
+    checkbox.addEventListener('click', (event) => {
+      event.stopPropagation();
+      handlers.onToggleSelection?.(server.id);
+    });
+    checkbox.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        event.stopPropagation();
+        handlers.onToggleSelection?.(server.id);
+      }
+    });
+    card.appendChild(checkbox);
   }
 
   const bannerUrl = getBannerUrl(server.id, server.banner ?? null);
@@ -135,11 +177,21 @@ export const createServerCard = (server: ServerView, handlers: ServerCardHandler
   card.appendChild(content);
 
   const openDetails = (): void => handlers.onOpenDetails(server.id);
-  card.addEventListener('click', openDetails);
+  card.addEventListener('click', () => {
+    if (options?.selectionMode) {
+      handlers.onToggleSelection?.(server.id);
+    } else {
+      openDetails();
+    }
+  });
   card.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      openDetails();
+      if (options?.selectionMode) {
+        handlers.onToggleSelection?.(server.id);
+      } else {
+        openDetails();
+      }
     }
   });
 

@@ -16,15 +16,24 @@ class_name = "DiscordRateLimiter"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["DiscordRateLimiter"]
+new_sqlite_classes = ["DiscordRateLimiter"]
 
-# Environment variables
-# For local development, DISCORD_REDIRECT_URI defaults to http://localhost:8787/api/auth/callback
-# For production/dev, set these in Cloudflare Workers dashboard or via wrangler secret:
-#   - DISCORD_CLIENT_ID
-#   - DISCORD_CLIENT_SECRET
-#   - SESSION_SECRET (generate with: openssl rand -hex 32)
-#   - DISCORD_REDIRECT_URI (https://metacord.app/api/auth/callback or https://dev.metacord.app/api/auth/callback)
+# KV Namespaces (dev — overridden in [env.production])
+kv_namespaces = [
+  { binding = "SESSIONS", id = "9f586389e8db4eea83367ad19c46f749" }
+]
+
+# Environment variables (dev — overridden in [env.production])
+# Secrets must be set via `wrangler secret put <NAME>`:
+#   - For dev (top-level):   wrangler secret put <NAME>
+#   - For production:        wrangler secret put <NAME> --env production
+#   Required secrets:
+#     - DISCORD_CLIENT_SECRET
+#     - SESSION_SECRET (generate with: openssl rand -hex 32)
+
+[vars]
+DISCORD_CLIENT_ID = "1463316345633374269"
+DISCORD_REDIRECT_URI = "https://dev.metacord.app/api/auth/callback"
 
 [env.production]
 # Production environment (main branch)
@@ -41,21 +50,5 @@ name = "DISCORD_RATE_LIMITER"
 class_name = "DiscordRateLimiter"
 
 [env.production.vars]
+DISCORD_CLIENT_ID = "1463314254664040501"
 DISCORD_REDIRECT_URI = "https://metacord.app/api/auth/callback"
-
-[env.development]
-# Development environment (dev branch)
-# Worker name: metacord-dev
-# Custom domain: dev.metacord.app
-# Deploy with: pnpm run deploy:dev
-name = "metacord-dev"
-kv_namespaces = [
-  { binding = "SESSIONS", id = "9f586389e8db4eea83367ad19c46f749" }
-]
-
-[[env.development.durable_objects.bindings]]
-name = "DISCORD_RATE_LIMITER"
-class_name = "DiscordRateLimiter"
-
-[env.development.vars]
-DISCORD_REDIRECT_URI = "https://dev.metacord.app/api/auth/callback"

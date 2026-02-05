@@ -1,7 +1,9 @@
 import { loadUserData, type UserDataStore } from './storage';
 
 export type FilterKey = 'all' | 'owned' | 'partner' | 'verified' | 'boosted' | 'discoverable';
-export type SectionKey = 'favorites' | 'owned' | 'public' | 'private';
+export type BuiltinSectionKey = 'favorites' | 'owned' | 'public' | 'private';
+export type DynamicSectionKey = `category-${string}`;
+export type SectionKey = BuiltinSectionKey | DynamicSectionKey;
 export type SortKey = 'name-asc' | 'name-desc' | 'online-desc';
 
 export const COLLAPSED_SECTIONS_KEY = 'discord_manager_collapsed_sections';
@@ -25,6 +27,8 @@ export interface AppState {
   activeFilters: Set<FilterKey>;
   search: string;
   sort: SortKey;
+  selectionMode: boolean;
+  selectedIds: Set<string>;
 }
 
 export interface SectionElements {
@@ -57,6 +61,11 @@ export const getElement = <T extends HTMLElement>(selector: string): T => {
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const BUILTIN_SECTIONS: BuiltinSectionKey[] = ['favorites', 'owned', 'public', 'private'];
+
+const isValidSectionKey = (value: string): value is SectionKey =>
+  (BUILTIN_SECTIONS as readonly string[]).includes(value) || value.startsWith('category-');
+
 export const loadCollapsedSections = (): Set<SectionKey> => {
   try {
     const stored = localStorage.getItem(COLLAPSED_SECTIONS_KEY);
@@ -64,7 +73,7 @@ export const loadCollapsedSections = (): Set<SectionKey> => {
     const parsed: unknown = JSON.parse(stored);
     if (!Array.isArray(parsed)) return new Set();
     return new Set(parsed.filter((item): item is SectionKey =>
-      typeof item === 'string' && ['favorites', 'owned', 'public', 'private'].includes(item)
+      typeof item === 'string' && isValidSectionKey(item)
     ));
   } catch {
     return new Set();
@@ -105,42 +114,43 @@ export const state: AppState = {
   activeFilters: new Set<FilterKey>(),
   search: '',
   sort: loadSortPreference(),
+  selectionMode: false,
+  selectedIds: new Set<string>(),
 };
 
-let _sections: Record<string, SectionElements> | null = null;
+const _builtinSections: Record<string, SectionElements> = {};
+const _dynamicSections: Record<string, SectionElements> = {};
 
-export const getSections = (): Record<string, SectionElements> => {
-  if (!_sections) {
-    _sections = {
-      favorites: {
-        section: getElement<HTMLElement>('favorites-section'),
-        list: getElement<HTMLElement>('favorites-list'),
-        count: getElement<HTMLElement>('favorites-count'),
-        content: getElement<HTMLElement>('favorites-content'),
-        header: getElement<HTMLButtonElement>('[data-collapse-toggle="favorites"]'),
-      },
-      owned: {
-        section: getElement<HTMLElement>('owned-section'),
-        list: getElement<HTMLElement>('owned-list'),
-        count: getElement<HTMLElement>('owned-count'),
-        content: getElement<HTMLElement>('owned-content'),
-        header: getElement<HTMLButtonElement>('[data-collapse-toggle="owned"]'),
-      },
-      public: {
-        section: getElement<HTMLElement>('public-section'),
-        list: getElement<HTMLElement>('public-list'),
-        count: getElement<HTMLElement>('public-count'),
-        content: getElement<HTMLElement>('public-content'),
-        header: getElement<HTMLButtonElement>('[data-collapse-toggle="public"]'),
-      },
-      private: {
-        section: getElement<HTMLElement>('private-section'),
-        list: getElement<HTMLElement>('private-list'),
-        count: getElement<HTMLElement>('private-count'),
-        content: getElement<HTMLElement>('private-content'),
-        header: getElement<HTMLButtonElement>('[data-collapse-toggle="private"]'),
-      },
+const getBuiltinSection = (key: BuiltinSectionKey): SectionElements => {
+  if (!_builtinSections[key]) {
+    _builtinSections[key] = {
+      section: getElement<HTMLElement>(`${key}-section`),
+      list: getElement<HTMLElement>(`${key}-list`),
+      count: getElement<HTMLElement>(`${key}-count`),
+      content: getElement<HTMLElement>(`${key}-content`),
+      header: getElement<HTMLButtonElement>(`[data-collapse-toggle="${key}"]`),
     };
   }
-  return _sections;
+  return _builtinSections[key];
+};
+
+export const getSections = (): Record<string, SectionElements> => {
+  const sections: Record<string, SectionElements> = {};
+  for (const key of BUILTIN_SECTIONS) {
+    sections[key] = getBuiltinSection(key);
+  }
+  for (const [key, el] of Object.entries(_dynamicSections)) {
+    sections[key] = el;
+  }
+  return sections;
+};
+
+export const registerDynamicSection = (key: DynamicSectionKey, elements: SectionElements): void => {
+  _dynamicSections[key] = elements;
+};
+
+export const clearDynamicSections = (): void => {
+  for (const key of Object.keys(_dynamicSections)) {
+    delete _dynamicSections[key];
+  }
 };

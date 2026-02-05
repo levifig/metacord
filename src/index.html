@@ -137,6 +137,10 @@
                   Download user_data.json
                 </span>
               </div>
+              <button class="btn btn-secondary" id="btn-categories" type="button" aria-describedby="categories-tooltip">
+                Manage categories
+              </button>
+              <span id="categories-tooltip" class="sr-only">Create custom categories to organize your servers</span>
               <div class="fetch-container" id="fetch-container">
                 <div class="fetch-actions">
                   <div class="tooltip-anchor" id="fetch-tooltip-anchor">
@@ -212,6 +216,15 @@
               <span id="filter-count" class="filter-count hidden" aria-live="polite"></span>
             </div>
             <div class="filter-controls">
+              <button
+                class="btn btn-ghost btn-sm"
+                id="btn-select-toggle"
+                type="button"
+                aria-pressed="false"
+                aria-label="Toggle multi-select mode"
+              >
+                Select
+              </button>
               <div class="sort-control">
                 <label for="sort-select" class="sr-only">Sort servers</label>
                 <select id="sort-select" class="sort-select">
@@ -233,6 +246,15 @@
               </div>
             </div>
           </section>
+
+          <div id="bulk-actions" class="bulk-actions hidden" role="toolbar" aria-label="Bulk actions">
+            <span id="bulk-count" class="bulk-count"></span>
+            <button id="bulk-select-all" class="btn btn-secondary btn-sm" type="button">Select All</button>
+            <button id="bulk-deselect" class="btn btn-secondary btn-sm" type="button">Deselect All</button>
+            <button id="bulk-favorite" class="btn btn-primary btn-sm" type="button">Favorite</button>
+            <button id="bulk-unfavorite" class="btn btn-secondary btn-sm" type="button">Unfavorite</button>
+            <button id="bulk-cancel" class="btn btn-ghost btn-sm" type="button">Cancel</button>
+          </div>
 
           <section class="section hidden" id="favorites-section">
             <button
@@ -258,6 +280,8 @@
               ></div>
             </div>
           </section>
+
+          <div id="category-sections-container"></div>
 
           <section class="section hidden" id="owned-section">
             <button
@@ -614,6 +638,50 @@
           </div>
           <p class="muted">This will download <code>guilds_api.json</code> with your server list.</p>
 
+          <div class="modal-actions">
+            <button class="btn btn-secondary" type="button" data-modal-close>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="categories-modal" aria-hidden="true">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="categories-title"
+      >
+        <header class="modal-header">
+          <h3 id="categories-title">Manage categories</h3>
+          <button
+            class="icon-button"
+            type="button"
+            data-modal-close
+            aria-label="Close"
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </header>
+        <div class="modal-body">
+          <p>Create custom categories to organize your servers.</p>
+          <div class="category-add-row">
+            <input
+              type="text"
+              id="category-name-input"
+              class="search-input"
+              placeholder="New category name"
+              maxlength="50"
+              autocomplete="off"
+              aria-label="New category name"
+            />
+            <button class="btn btn-primary btn-sm" id="btn-add-category" type="button">
+              Add
+            </button>
+          </div>
+          <div id="categories-list" class="categories-list" role="list" aria-label="Categories"></div>
           <div class="modal-actions">
             <button class="btn btn-secondary" type="button" data-modal-close>
               Close

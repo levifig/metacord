@@ -11,6 +11,11 @@ import {
   exportUserData,
   importUserData,
   createDefaultUserData,
+  addCategory,
+  updateCategory,
+  deleteCategory,
+  moveCategory,
+  assignServerToCategory,
   type UserDataStore,
   type WidgetCacheEntry,
 } from '../storage';
@@ -53,12 +58,14 @@ describe('createDefaultUserData', () => {
   it('returns an object with correct shape and defaults', () => {
     const data = createDefaultUserData();
     expect(data).toEqual({
-      version: 1,
+      version: 2,
       favorites: [],
       nicknames: {},
       notes: {},
       widgetCache: {},
       lastFetchTimestamp: null,
+      categories: [],
+      serverCategories: {},
     });
   });
 
@@ -78,16 +85,35 @@ describe('loadUserData', () => {
 
   it('loads valid stored data', () => {
     const stored: UserDataStore = {
-      version: 1,
+      version: 2,
       favorites: ['guild1', 'guild2'],
       nicknames: { guild1: 'My Server' },
       notes: { guild1: 'Some notes' },
       widgetCache: {},
       lastFetchTimestamp: '2025-01-01T00:00:00Z',
+      categories: [],
+      serverCategories: {},
     };
     localStorage.setItem(TEST_KEY, JSON.stringify(stored));
     const data = loadUserData(opts);
     expect(data).toEqual(stored);
+  });
+
+  it('migrates v1 data to v2 on load', () => {
+    const v1Data = {
+      version: 1,
+      favorites: ['guild1'],
+      nicknames: {},
+      notes: {},
+      widgetCache: {},
+      lastFetchTimestamp: null,
+    };
+    localStorage.setItem(TEST_KEY, JSON.stringify(v1Data));
+    const data = loadUserData(opts);
+    expect(data.version).toBe(2);
+    expect(data.categories).toEqual([]);
+    expect(data.serverCategories).toEqual({});
+    expect(data.favorites).toEqual(['guild1']);
   });
 
   it('returns default data for corrupted JSON', () => {
@@ -180,12 +206,14 @@ describe('loadUserData', () => {
   it('uses default storage key when no options provided', () => {
     const defaultKey = 'discord_manager_user_data';
     const stored: UserDataStore = {
-      version: 1,
+      version: 2,
       favorites: ['guild1'],
       nicknames: {},
       notes: {},
       widgetCache: {},
       lastFetchTimestamp: null,
+      categories: [],
+      serverCategories: {},
     };
     localStorage.setItem(defaultKey, JSON.stringify(stored));
     const data = loadUserData();
@@ -439,12 +467,14 @@ describe('exportUserData', () => {
 describe('importUserData', () => {
   it('imports valid user data', () => {
     const validData: UserDataStore = {
-      version: 1,
+      version: 2,
       favorites: ['guild1'],
       nicknames: { guild1: 'Test' },
       notes: {},
       widgetCache: {},
       lastFetchTimestamp: '2025-01-01T00:00:00Z',
+      categories: [],
+      serverCategories: {},
     };
     const result = importUserData(validData, opts);
     expect(result.favorites).toEqual(['guild1']);
@@ -476,12 +506,14 @@ describe('importUserData', () => {
 
   it('persists imported data to localStorage', () => {
     const validData: UserDataStore = {
-      version: 1,
+      version: 2,
       favorites: ['guild1'],
       nicknames: {},
       notes: {},
       widgetCache: {},
       lastFetchTimestamp: null,
+      categories: [],
+      serverCategories: {},
     };
     importUserData(validData, opts);
     const loaded = loadUserData(opts);
@@ -529,5 +561,212 @@ describe('custom storage key option', () => {
 
     expect(loadUserData(key1).favorites).toEqual(['guild_a']);
     expect(loadUserData(key2).favorites).toEqual(['guild_b']);
+  });
+});
+
+describe('addCategory', () => {
+  beforeEach(() => {
+    vi.stubGlobal('crypto', { randomUUID: () => 'test-uuid-1' });
+  });
+
+  it('adds a new category', () => {
+    const data = createDefaultUserData();
+    const result = addCategory(data, 'Gaming', opts);
+    expect(result.categories).toHaveLength(1);
+    expect(result.categories[0].name).toBe('Gaming');
+    expect(result.categories[0].order).toBe(0);
+  });
+
+  it('trims whitespace from name', () => {
+    const data = createDefaultUserData();
+    const result = addCategory(data, '  Gaming  ', opts);
+    expect(result.categories[0].name).toBe('Gaming');
+  });
+
+  it('does nothing for empty name', () => {
+    const data = createDefaultUserData();
+    const result = addCategory(data, '   ', opts);
+    expect(result.categories).toHaveLength(0);
+  });
+
+  it('assigns incrementing order values', () => {
+    vi.stubGlobal('crypto', {
+      randomUUID: vi.fn()
+        .mockReturnValueOnce('uuid-1')
+        .mockReturnValueOnce('uuid-2'),
+    });
+    let data = createDefaultUserData();
+    data = addCategory(data, 'First', opts);
+    data = addCategory(data, 'Second', opts);
+    expect(data.categories).toHaveLength(2);
+    expect(data.categories[0].order).toBe(0);
+    expect(data.categories[1].order).toBe(1);
+  });
+
+  it('persists to localStorage', () => {
+    const data = createDefaultUserData();
+    addCategory(data, 'Gaming', opts);
+    const loaded = loadUserData(opts);
+    expect(loaded.categories).toHaveLength(1);
+  });
+});
+
+describe('updateCategory', () => {
+  it('renames a category', () => {
+    let data = createDefaultUserData();
+    data.categories = [{ id: 'cat-1', name: 'Old', order: 0 }];
+    const result = updateCategory(data, 'cat-1', 'New Name', opts);
+    expect(result.categories[0].name).toBe('New Name');
+  });
+
+  it('does nothing for empty name', () => {
+    let data = createDefaultUserData();
+    data.categories = [{ id: 'cat-1', name: 'Old', order: 0 }];
+    const result = updateCategory(data, 'cat-1', '', opts);
+    expect(result.categories[0].name).toBe('Old');
+  });
+
+  it('does nothing for non-existent category', () => {
+    let data = createDefaultUserData();
+    data.categories = [{ id: 'cat-1', name: 'Old', order: 0 }];
+    const result = updateCategory(data, 'cat-999', 'New', opts);
+    expect(result.categories[0].name).toBe('Old');
+  });
+});
+
+describe('deleteCategory', () => {
+  it('removes the category', () => {
+    let data = createDefaultUserData();
+    data.categories = [{ id: 'cat-1', name: 'Gaming', order: 0 }];
+    const result = deleteCategory(data, 'cat-1', opts);
+    expect(result.categories).toHaveLength(0);
+  });
+
+  it('unassigns servers from deleted category', () => {
+    let data = createDefaultUserData();
+    data.categories = [{ id: 'cat-1', name: 'Gaming', order: 0 }];
+    data.serverCategories = { guild1: 'cat-1', guild2: 'cat-2' };
+    const result = deleteCategory(data, 'cat-1', opts);
+    expect(result.serverCategories.guild1).toBeUndefined();
+    expect(result.serverCategories.guild2).toBe('cat-2');
+  });
+
+  it('persists to localStorage', () => {
+    let data = createDefaultUserData();
+    data.categories = [{ id: 'cat-1', name: 'Gaming', order: 0 }];
+    saveUserData(data, opts);
+    deleteCategory(data, 'cat-1', opts);
+    const loaded = loadUserData(opts);
+    expect(loaded.categories).toHaveLength(0);
+  });
+});
+
+describe('moveCategory', () => {
+  it('moves a category up', () => {
+    let data = createDefaultUserData();
+    data.categories = [
+      { id: 'cat-1', name: 'First', order: 0 },
+      { id: 'cat-2', name: 'Second', order: 1 },
+    ];
+    const result = moveCategory(data, 'cat-2', 'up', opts);
+    const sorted = [...result.categories].sort((a, b) => a.order - b.order);
+    expect(sorted[0].id).toBe('cat-2');
+    expect(sorted[1].id).toBe('cat-1');
+  });
+
+  it('moves a category down', () => {
+    let data = createDefaultUserData();
+    data.categories = [
+      { id: 'cat-1', name: 'First', order: 0 },
+      { id: 'cat-2', name: 'Second', order: 1 },
+    ];
+    const result = moveCategory(data, 'cat-1', 'down', opts);
+    const sorted = [...result.categories].sort((a, b) => a.order - b.order);
+    expect(sorted[0].id).toBe('cat-2');
+    expect(sorted[1].id).toBe('cat-1');
+  });
+
+  it('does nothing when moving first item up', () => {
+    let data = createDefaultUserData();
+    data.categories = [
+      { id: 'cat-1', name: 'First', order: 0 },
+      { id: 'cat-2', name: 'Second', order: 1 },
+    ];
+    const result = moveCategory(data, 'cat-1', 'up', opts);
+    expect(result.categories).toEqual(data.categories);
+  });
+
+  it('does nothing when moving last item down', () => {
+    let data = createDefaultUserData();
+    data.categories = [
+      { id: 'cat-1', name: 'First', order: 0 },
+      { id: 'cat-2', name: 'Second', order: 1 },
+    ];
+    const result = moveCategory(data, 'cat-2', 'down', opts);
+    expect(result.categories).toEqual(data.categories);
+  });
+});
+
+describe('assignServerToCategory', () => {
+  it('assigns a server to a category', () => {
+    const data = createDefaultUserData();
+    const result = assignServerToCategory(data, 'guild1', 'cat-1', opts);
+    expect(result.serverCategories.guild1).toBe('cat-1');
+  });
+
+  it('unassigns a server (set to null)', () => {
+    let data = createDefaultUserData();
+    data.serverCategories = { guild1: 'cat-1' };
+    const result = assignServerToCategory(data, 'guild1', null, opts);
+    expect(result.serverCategories.guild1).toBeUndefined();
+  });
+
+  it('reassigns a server to a different category', () => {
+    let data = createDefaultUserData();
+    data.serverCategories = { guild1: 'cat-1' };
+    const result = assignServerToCategory(data, 'guild1', 'cat-2', opts);
+    expect(result.serverCategories.guild1).toBe('cat-2');
+  });
+
+  it('persists to localStorage', () => {
+    const data = createDefaultUserData();
+    assignServerToCategory(data, 'guild1', 'cat-1', opts);
+    const loaded = loadUserData(opts);
+    expect(loaded.serverCategories.guild1).toBe('cat-1');
+  });
+});
+
+describe('import v1 data with categories migration', () => {
+  it('migrates imported v1 data to v2 with empty categories', () => {
+    const v1Data = {
+      version: 1,
+      favorites: ['guild1'],
+      nicknames: { guild1: 'Test' },
+      notes: {},
+      widgetCache: {},
+      lastFetchTimestamp: null,
+    };
+    const result = importUserData(v1Data, opts);
+    expect(result.version).toBe(2);
+    expect(result.categories).toEqual([]);
+    expect(result.serverCategories).toEqual({});
+    expect(result.favorites).toEqual(['guild1']);
+  });
+
+  it('preserves categories when importing v2 data', () => {
+    const v2Data = {
+      version: 2,
+      favorites: [],
+      nicknames: {},
+      notes: {},
+      widgetCache: {},
+      lastFetchTimestamp: null,
+      categories: [{ id: 'cat-1', name: 'Gaming', order: 0 }],
+      serverCategories: { guild1: 'cat-1' },
+    };
+    const result = importUserData(v2Data, opts);
+    expect(result.categories).toHaveLength(1);
+    expect(result.categories[0].name).toBe('Gaming');
+    expect(result.serverCategories.guild1).toBe('cat-1');
   });
 });

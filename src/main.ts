@@ -70,6 +70,7 @@ const fetchModal = createModalController(getElement('fetch-modal'));
 const detailsModal = createModalController(getElement('details-modal'));
 const instructionsModal = createModalController(getElement('instructions-modal'));
 const demoModal = createModalController(getElement('demo-modal'));
+const categoriesModal = createModalController(getElement('categories-modal'));
 
 // --- Initialize modules ---
 
@@ -91,6 +92,7 @@ function closeAppOverlays(): void {
   detailsModal.close();
   instructionsModal.close();
   demoModal.close();
+  categoriesModal.close();
   toastRegion.replaceChildren();
 }
 
@@ -129,7 +131,7 @@ const hydrateApp = async (): Promise<void> => {
 try {
   setFooterYear();
   setFooterBuildInfo();
-  setupEvents({ importModal, fetchModal, instructionsModal, demoModal });
+  setupEvents({ importModal, fetchModal, instructionsModal, demoModal, categoriesModal });
   setupDemoMode();
   if (isDemoMode) {
     hydrateDemo();
