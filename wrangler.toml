@@ -40,7 +40,7 @@ DISCORD_REDIRECT_URI = "https://dev.metacord.app/api/auth/callback"
 # Worker name: metacord-prod
 # Custom domain: metacord.app
 # Deploy with: pnpm run deploy
-name = "metacord-prod"
+name = "metacord-dev"
 kv_namespaces = [
   { binding = "SESSIONS", id = "89d6fd289f654bfc802fc9a3eb2e4cd6" }
 ]
