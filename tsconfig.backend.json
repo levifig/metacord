@@ -4,7 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2021"],
-    "types": [],
+    "types": ["@cloudflare/workers-types"],
     "strict": true,
     "noEmit": true,
     "isolatedModules": true,
@@ -14,5 +14,5 @@
     "resolveJsonModule": true
   },
   "include": ["functions/**/*", "shared/**/*", "src/worker.ts", "worker-configuration.d.ts"],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "functions/**/__tests__/**"]
 }
