@@ -16,7 +16,7 @@ class_name = "DiscordRateLimiter"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["DiscordRateLimiter"]
+new_sqlite_classes = ["DiscordRateLimiter"]
 
 # Environment variables
 # For local development, DISCORD_REDIRECT_URI defaults to http://localhost:8787/api/auth/callback
