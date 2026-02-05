@@ -3,6 +3,11 @@ name = "metacord-dev"
 main = "src/worker.ts"
 compatibility_date = "2026-01-21"
 
+[observability]
+[observability.logs]
+enabled = false
+invocation_logs = true
+
 [assets]
 directory = "dist"
 binding = "ASSETS"
