@@ -1517,6 +1517,59 @@ input:focus-visible {
   color: var(--color-text-muted);
 }
 
+.roles-section {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.roles-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.roles-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.roles-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.role-badge {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+
+.role-badge:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.role-badge:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.roles-note {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+}
+
 .progress-bar {
   width: 100%;
   height: 8px;

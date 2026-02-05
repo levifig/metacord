@@ -8,7 +8,7 @@ import {
   updateNotes,
   type WidgetCacheEntry,
 } from './storage';
-import { createServerCard, type ServerView } from '../components/serverCard';
+import { createServerCard, type ServerView, type ServerCardOptions } from '../components/serverCard';
 import type { ModalController } from '../components/modal';
 import type { ToastManager } from '../components/toast';
 import { createElement, getIconUrl } from './utils';
@@ -193,6 +193,15 @@ export const initDetailsModal = (modal: ModalController): void => {
   _detailsModal = modal;
 };
 
+export const toggleSelection = (guildId: string): void => {
+  if (state.selectedIds.has(guildId)) {
+    state.selectedIds.delete(guildId);
+  } else {
+    state.selectedIds.add(guildId);
+  }
+  render();
+};
+
 const renderSection = (key: string, servers: ServerView[]): void => {
   const sections = getSections();
   const section = sections[key];
@@ -204,6 +213,9 @@ const renderSection = (key: string, servers: ServerView[]): void => {
   }
   section.section.classList.remove('hidden');
   servers.forEach((server) => {
+    const cardOptions: ServerCardOptions | undefined = state.selectionMode
+      ? { selectionMode: true, isSelected: state.selectedIds.has(server.id) }
+      : undefined;
     section.list.appendChild(
       createServerCard(server, {
         onToggleFavorite: (guildId) => {
@@ -216,7 +228,8 @@ const renderSection = (key: string, servers: ServerView[]): void => {
           render();
         },
         onOpenDetails: (guildId) => openDetails(guildId),
-      }),
+        onToggleSelection: (guildId) => toggleSelection(guildId),
+      }, cardOptions),
     );
   });
 };
@@ -345,6 +358,42 @@ export const openDetails = async (guildId: string): Promise<void> => {
   meta.appendChild(createElement('div', 'detail-row', `Roles: ${rolesCount}`));
   meta.appendChild(createElement('div', 'detail-row', widgetStatus));
   detailsBody.appendChild(meta);
+
+  const roles = member?.roles ?? [];
+  const rolesSection = createElement('div', 'roles-section');
+  const rolesHeader = createElement('div', 'roles-header');
+  const rolesLabel = createElement('span', 'roles-label', `Roles (${roles.length})`);
+  rolesHeader.appendChild(rolesLabel);
+  rolesSection.appendChild(rolesHeader);
+
+  if (roles.length > 0) {
+    const rolesList = createElement('div', 'roles-list');
+    rolesList.setAttribute('role', 'list');
+    rolesList.setAttribute('aria-label', 'Role IDs');
+    for (const roleId of roles) {
+      const badge = createElement('button', 'role-badge');
+      badge.type = 'button';
+      badge.textContent = roleId;
+      badge.setAttribute('role', 'listitem');
+      badge.setAttribute('aria-label', `Role ID ${roleId}, click to copy`);
+      badge.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(roleId);
+          showToast('Role ID copied');
+        } catch {
+          showToast('Unable to copy role ID', { variant: 'error' });
+        }
+      });
+      rolesList.appendChild(badge);
+    }
+    rolesSection.appendChild(rolesList);
+    const rolesNote = createElement('p', 'roles-note muted', 'Role names require bot permissions \u2014 showing role IDs');
+    rolesSection.appendChild(rolesNote);
+  } else {
+    const noRoles = createElement('p', 'muted', 'No roles');
+    rolesSection.appendChild(noRoles);
+  }
+  detailsBody.appendChild(rolesSection);
 
   const nicknameField = createElement('div', 'form-field');
   const nicknameLabel = createElement('label', '', 'Nickname');
