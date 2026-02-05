@@ -2,6 +2,9 @@
 name = "metacord-dev"
 main = "src/worker.ts"
 compatibility_date = "2026-01-21"
+kv_namespaces = [
+  { binding = "SESSIONS", id = "9f586389e8db4eea83367ad19c46f749" }
+]
 
 [observability]
 [observability.logs]
@@ -16,11 +19,6 @@ directory = "dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = true
-
-# KV Namespaces (dev — overridden in [env.production])
-kv_namespaces = [
-  { binding = "SESSIONS", id = "9f586389e8db4eea83367ad19c46f749" }
-]
 
 # Durable Objects
 [[durable_objects.bindings]]
