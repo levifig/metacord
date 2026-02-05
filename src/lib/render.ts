@@ -15,6 +15,7 @@ import type { ToastManager } from '../components/toast';
 import { createElement, getIconUrl } from './utils';
 import { fetchGuildMember } from './api';
 import {
+  type DynamicSectionKey,
   type FilterKey,
   type SortKey,
   type SectionElements,
@@ -219,6 +220,7 @@ export const toggleSelection = (guildId: string): void => {
 const renderSection = (key: string, servers: ServerView[]): void => {
   const sections = getSections();
   const section = sections[key];
+  if (!section) return;
   section.list.replaceChildren();
   section.count.textContent = `${servers.length}`;
   if (servers.length === 0) {
@@ -251,9 +253,10 @@ const renderSection = (key: string, servers: ServerView[]): void => {
 // --- Dynamic category section creation ---
 
 const createCategorySectionDOM = (categoryId: string, categoryName: string): SectionElements => {
-  const sectionKey = `category-${categoryId}`;
+  const sectionKey: DynamicSectionKey = `category-${categoryId}`;
   const section = createElement('section', 'section hidden');
   section.id = `${sectionKey}-section`;
+  section.setAttribute('data-animate', '');
 
   const header = document.createElement('button');
   header.className = 'section-header';
@@ -326,7 +329,7 @@ export const render = (): void => {
 
   // Render each category section
   for (const category of sortedCategories) {
-    const sectionKey = `category-${category.id}`;
+    const sectionKey: DynamicSectionKey = `category-${category.id}`;
     const categoryServers = filtered.filter((server) => {
       if (server.isFavorite) return false;
       return state.userData.serverCategories[server.id] === category.id;
@@ -488,10 +491,11 @@ export const openDetails = async (guildId: string): Promise<void> => {
     rolesList.setAttribute('role', 'list');
     rolesList.setAttribute('aria-label', 'Role IDs');
     for (const roleId of roles) {
+      const item = createElement('div');
+      item.setAttribute('role', 'listitem');
       const badge = createElement('button', 'role-badge');
       badge.type = 'button';
       badge.textContent = roleId;
-      badge.setAttribute('role', 'listitem');
       badge.setAttribute('aria-label', `Role ID ${roleId}, click to copy`);
       badge.addEventListener('click', async () => {
         try {
@@ -501,7 +505,8 @@ export const openDetails = async (guildId: string): Promise<void> => {
           showToast('Unable to copy role ID', { variant: 'error' });
         }
       });
-      rolesList.appendChild(badge);
+      item.appendChild(badge);
+      rolesList.appendChild(item);
     }
     rolesSection.appendChild(rolesList);
     const rolesNote = createElement('p', 'roles-note muted', 'Role names require bot permissions \u2014 showing role IDs');

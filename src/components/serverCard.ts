@@ -39,8 +39,14 @@ export const createServerCard = (
 ): HTMLElement => {
   const card = createElement('article', 'server-card');
   card.tabIndex = 0;
-  card.setAttribute('role', 'button');
-  card.setAttribute('aria-label', `Open details for ${server.nickname ?? server.name}`);
+  if (options?.selectionMode) {
+    card.setAttribute('role', 'checkbox');
+    card.setAttribute('aria-checked', options.isSelected ? 'true' : 'false');
+    card.setAttribute('aria-label', `Select ${server.nickname ?? server.name}`);
+  } else {
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `Open details for ${server.nickname ?? server.name}`);
+  }
   card.dataset.guildId = server.id;
 
   if (server.owner) {

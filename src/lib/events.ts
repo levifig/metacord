@@ -3,6 +3,7 @@ import {
   importUserData,
   exportUserData,
   toggleFavorite,
+  saveUserData,
   addCategory,
   updateCategory,
   deleteCategory,
@@ -298,23 +299,35 @@ const bulkDeselectAll = (): void => {
 };
 
 const bulkFavorite = (): void => {
-  for (const guildId of state.selectedIds) {
-    if (!state.userData.favorites.includes(guildId)) {
-      state.userData = toggleFavorite(state.userData, guildId, storageOptions);
-    }
+  const toAdd = [...state.selectedIds].filter(
+    (guildId) => !state.userData.favorites.includes(guildId),
+  );
+  if (toAdd.length > 0) {
+    state.userData = {
+      ...state.userData,
+      favorites: [...state.userData.favorites, ...toAdd],
+    };
+    saveUserData(state.userData, storageOptions);
   }
-  const count = state.selectedIds.size;
+  const count = toAdd.length;
   exitSelectionMode();
   showToast(`Added ${count} server${count === 1 ? '' : 's'} to favorites`);
 };
 
 const bulkUnfavorite = (): void => {
-  for (const guildId of state.selectedIds) {
-    if (state.userData.favorites.includes(guildId)) {
-      state.userData = toggleFavorite(state.userData, guildId, storageOptions);
-    }
+  const toRemove = new Set(
+    [...state.selectedIds].filter((guildId) =>
+      state.userData.favorites.includes(guildId),
+    ),
+  );
+  if (toRemove.size > 0) {
+    state.userData = {
+      ...state.userData,
+      favorites: state.userData.favorites.filter((id) => !toRemove.has(id)),
+    };
+    saveUserData(state.userData, storageOptions);
   }
-  const count = state.selectedIds.size;
+  const count = toRemove.size;
   exitSelectionMode();
   showToast(`Removed ${count} server${count === 1 ? '' : 's'} from favorites`);
 };
@@ -616,7 +629,10 @@ export const setupEvents = (options: SetupEventsOptions): void => {
 
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && state.selectionMode) {
-      exitSelectionMode();
+      const openOverlay = document.querySelector('.modal-overlay:not(.hidden)');
+      if (!openOverlay) {
+        exitSelectionMode();
+      }
     }
   });
 };

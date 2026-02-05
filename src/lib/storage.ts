@@ -234,8 +234,8 @@ export const importUserData = (raw: unknown, options?: StorageOptions): UserData
     notes: toStringRecord(raw.notes),
     widgetCache: toWidgetCache(raw.widgetCache),
     lastFetchTimestamp: typeof raw.lastFetchTimestamp === 'string' ? raw.lastFetchTimestamp : null,
-    categories: toCategoryDefinitions((raw as unknown as Record<string, unknown>).categories),
-    serverCategories: toStringRecord((raw as unknown as Record<string, unknown>).serverCategories),
+    categories: toCategoryDefinitions(raw.categories),
+    serverCategories: toStringRecord(raw.serverCategories),
   });
   saveUserData(sanitized, options);
   return sanitized;
@@ -247,7 +247,11 @@ export const addCategory = (
   options?: StorageOptions,
 ): UserDataStore => {
   const trimmed = name.trim();
-  if (trimmed.length === 0) return data;
+  if (trimmed.length === 0 || trimmed.length > 50) return data;
+  const isDuplicate = data.categories.some(
+    (cat) => cat.name.toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (isDuplicate) return data;
   const maxOrder = data.categories.reduce((max, cat) => Math.max(max, cat.order), -1);
   const newCategory: CategoryDefinition = {
     id: crypto.randomUUID(),
@@ -267,6 +271,13 @@ export const updateCategory = (
 ): UserDataStore => {
   const trimmed = name.trim();
   if (trimmed.length === 0) return data;
+  if (trimmed.length > 50) return data;
+  const index = data.categories.findIndex((cat) => cat.id === categoryId);
+  if (index < 0) return data;
+  const isDuplicate = data.categories.some(
+    (cat) => cat.id !== categoryId && cat.name.toLowerCase() === trimmed.toLowerCase(),
+  );
+  if (isDuplicate) return data;
   const categories = data.categories.map((cat) =>
     cat.id === categoryId ? { ...cat, name: trimmed } : cat,
   );

@@ -137,13 +137,10 @@
                   Download user_data.json
                 </span>
               </div>
-              <button
-                class="btn btn-secondary"
-                id="btn-categories"
-                type="button"
-              >
+              <button class="btn btn-secondary" id="btn-categories" type="button" aria-describedby="categories-tooltip">
                 Manage categories
               </button>
+              <span id="categories-tooltip" class="sr-only">Create custom categories to organize your servers</span>
               <div class="fetch-container" id="fetch-container">
                 <div class="fetch-actions">
                   <div class="tooltip-anchor" id="fetch-tooltip-anchor">
@@ -676,6 +673,7 @@
               id="category-name-input"
               class="search-input"
               placeholder="New category name"
+              maxlength="50"
               autocomplete="off"
               aria-label="New category name"
             />

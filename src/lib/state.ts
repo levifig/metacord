@@ -2,7 +2,8 @@ import { loadUserData, type UserDataStore } from './storage';
 
 export type FilterKey = 'all' | 'owned' | 'partner' | 'verified' | 'boosted' | 'discoverable';
 export type BuiltinSectionKey = 'favorites' | 'owned' | 'public' | 'private';
-export type SectionKey = BuiltinSectionKey | string;
+export type DynamicSectionKey = `category-${string}`;
+export type SectionKey = BuiltinSectionKey | DynamicSectionKey;
 export type SortKey = 'name-asc' | 'name-desc' | 'online-desc';
 
 export const COLLAPSED_SECTIONS_KEY = 'discord_manager_collapsed_sections';
@@ -63,7 +64,7 @@ export const isRecord = (value: unknown): value is Record<string, unknown> =>
 const BUILTIN_SECTIONS: BuiltinSectionKey[] = ['favorites', 'owned', 'public', 'private'];
 
 const isValidSectionKey = (value: string): value is SectionKey =>
-  BUILTIN_SECTIONS.includes(value as BuiltinSectionKey) || value.startsWith('category-');
+  (BUILTIN_SECTIONS as readonly string[]).includes(value) || value.startsWith('category-');
 
 export const loadCollapsedSections = (): Set<SectionKey> => {
   try {
@@ -144,12 +145,8 @@ export const getSections = (): Record<string, SectionElements> => {
   return sections;
 };
 
-export const registerDynamicSection = (key: string, elements: SectionElements): void => {
+export const registerDynamicSection = (key: DynamicSectionKey, elements: SectionElements): void => {
   _dynamicSections[key] = elements;
-};
-
-export const unregisterDynamicSection = (key: string): void => {
-  delete _dynamicSections[key];
 };
 
 export const clearDynamicSections = (): void => {
