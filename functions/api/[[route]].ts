@@ -88,6 +88,7 @@ app.get('/api/auth/callback', async (c) => {
   const verifier = cookies[getOAuthCookieName(OAUTH_VERIFIER_COOKIE, secure)];
 
   if (!savedState || !verifier || savedState !== state) {
+    console.error('OAuth state mismatch:', { savedState: !!savedState, verifier: !!verifier, stateMatch: savedState === state, cookieNames: Object.keys(cookies) });
     return errorResponse('Invalid state parameter', 400);
   }
 
@@ -107,6 +108,8 @@ app.get('/api/auth/callback', async (c) => {
   });
 
   if (!tokenResponse.ok) {
+    const errorBody = await tokenResponse.text();
+    console.error('Discord token exchange failed:', tokenResponse.status, errorBody);
     return errorResponse('Failed to exchange authorization code', 500);
   }
 
