@@ -1,5 +1,5 @@
 import { logout } from './api';
-import { importUserData, exportUserData } from './storage';
+import { importUserData, exportUserData, toggleFavorite } from './storage';
 import { createElement } from './utils';
 import type { ModalController } from '../components/modal';
 import {
@@ -16,7 +16,7 @@ import {
   state,
   storageOptions,
 } from './state';
-import { render, setImportStatus, setScreen, showToast } from './render';
+import { render, setImportStatus, setScreen, showToast, getVisibleServerIds } from './render';
 import {
   fetchState,
   performWidgetFetch,
@@ -258,6 +258,59 @@ const attachFilterTooltips = (): void => {
   });
 };
 
+const enterSelectionMode = (): void => {
+  state.selectionMode = true;
+  state.selectedIds.clear();
+  render();
+};
+
+const exitSelectionMode = (): void => {
+  state.selectionMode = false;
+  state.selectedIds.clear();
+  render();
+};
+
+const toggleSelectionMode = (): void => {
+  if (state.selectionMode) {
+    exitSelectionMode();
+  } else {
+    enterSelectionMode();
+  }
+};
+
+const bulkSelectAll = (): void => {
+  const ids = getVisibleServerIds();
+  ids.forEach((id) => state.selectedIds.add(id));
+  render();
+};
+
+const bulkDeselectAll = (): void => {
+  state.selectedIds.clear();
+  render();
+};
+
+const bulkFavorite = (): void => {
+  for (const guildId of state.selectedIds) {
+    if (!state.userData.favorites.includes(guildId)) {
+      state.userData = toggleFavorite(state.userData, guildId, storageOptions);
+    }
+  }
+  const count = state.selectedIds.size;
+  exitSelectionMode();
+  showToast(`Added ${count} server${count === 1 ? '' : 's'} to favorites`);
+};
+
+const bulkUnfavorite = (): void => {
+  for (const guildId of state.selectedIds) {
+    if (state.userData.favorites.includes(guildId)) {
+      state.userData = toggleFavorite(state.userData, guildId, storageOptions);
+    }
+  }
+  const count = state.selectedIds.size;
+  exitSelectionMode();
+  showToast(`Removed ${count} server${count === 1 ? '' : 's'} from favorites`);
+};
+
 export interface SetupEventsOptions {
   importModal: ModalController;
   fetchModal: ModalController;
@@ -440,4 +493,28 @@ export const setupEvents = (options: SetupEventsOptions): void => {
     fetchState.shouldStop = true;
   });
   fetchForce.addEventListener('change', updateFetchSkipInfo);
+
+  // --- Selection mode ---
+  const selectToggle = document.getElementById('btn-select-toggle');
+  if (selectToggle) {
+    selectToggle.addEventListener('click', toggleSelectionMode);
+  }
+
+  const bulkSelectAllBtn = document.getElementById('bulk-select-all');
+  const bulkDeselectBtn = document.getElementById('bulk-deselect');
+  const bulkFavoriteBtn = document.getElementById('bulk-favorite');
+  const bulkUnfavoriteBtn = document.getElementById('bulk-unfavorite');
+  const bulkCancelBtn = document.getElementById('bulk-cancel');
+
+  bulkSelectAllBtn?.addEventListener('click', bulkSelectAll);
+  bulkDeselectBtn?.addEventListener('click', bulkDeselectAll);
+  bulkFavoriteBtn?.addEventListener('click', bulkFavorite);
+  bulkUnfavoriteBtn?.addEventListener('click', bulkUnfavorite);
+  bulkCancelBtn?.addEventListener('click', exitSelectionMode);
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && state.selectionMode) {
+      exitSelectionMode();
+    }
+  });
 };

@@ -6,6 +6,7 @@ import {
   toggleFavorite,
   updateNickname,
   updateNotes,
+  assignServerToCategory,
   type WidgetCacheEntry,
 } from './storage';
 import { createServerCard, type ServerView, type ServerCardOptions } from '../components/serverCard';
@@ -16,9 +17,13 @@ import { fetchGuildMember } from './api';
 import {
   type FilterKey,
   type SortKey,
+  type SectionElements,
+  collapsedSections,
   getElement,
   getSections,
   isDemoMode,
+  registerDynamicSection,
+  clearDynamicSections,
   state,
   storageOptions,
 } from './state';
@@ -193,6 +198,14 @@ export const initDetailsModal = (modal: ModalController): void => {
   _detailsModal = modal;
 };
 
+export const getVisibleServerIds = (): string[] => {
+  const allViews = buildServerViews();
+  const filtered = allViews.filter((server) =>
+    matchesFilter(server, state.activeFilters) && matchesSearch(server, state.search.trim()),
+  );
+  return filtered.map((s) => s.id);
+};
+
 export const toggleSelection = (guildId: string): void => {
   if (state.selectedIds.has(guildId)) {
     state.selectedIds.delete(guildId);
@@ -286,6 +299,25 @@ export const render = (): void => {
       filterCount.textContent = '';
       filterCount.classList.add('hidden');
     }
+  }
+
+  // Update bulk action bar
+  const bulkActions = document.getElementById('bulk-actions');
+  const bulkCount = document.getElementById('bulk-count');
+  const selectToggle = document.getElementById('btn-select-toggle');
+  if (bulkActions && bulkCount) {
+    const selectedCount = state.selectedIds.size;
+    if (state.selectionMode && selectedCount > 0) {
+      bulkActions.classList.remove('hidden');
+      bulkCount.textContent = `${selectedCount} selected`;
+    } else {
+      bulkActions.classList.add('hidden');
+      bulkCount.textContent = '';
+    }
+  }
+  if (selectToggle) {
+    selectToggle.classList.toggle('is-active', state.selectionMode);
+    selectToggle.setAttribute('aria-pressed', state.selectionMode ? 'true' : 'false');
   }
 };
 
