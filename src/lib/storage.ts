@@ -4,6 +4,12 @@ export interface WidgetCacheEntry {
   lastCached: string | null;
 }
 
+export interface CategoryDefinition {
+  id: string;
+  name: string;
+  order: number;
+}
+
 export interface UserDataStore {
   version: number;
   favorites: string[];
@@ -11,6 +17,8 @@ export interface UserDataStore {
   notes: Record<string, string>;
   widgetCache: Record<string, WidgetCacheEntry>;
   lastFetchTimestamp: string | null;
+  categories: CategoryDefinition[];
+  serverCategories: Record<string, string>;
 }
 
 interface StorageOptions {
@@ -20,12 +28,14 @@ interface StorageOptions {
 const STORAGE_KEY = 'discord_manager_user_data';
 
 export const createDefaultUserData = (): UserDataStore => ({
-  version: 1,
+  version: 2,
   favorites: [],
   nicknames: {},
   notes: {},
   widgetCache: {},
   lastFetchTimestamp: null,
+  categories: [],
+  serverCategories: {},
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -58,7 +68,29 @@ const toWidgetCache = (value: unknown): Record<string, WidgetCacheEntry> => {
   }, {});
 };
 
+const toCategoryDefinitions = (value: unknown): CategoryDefinition[] => {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is CategoryDefinition =>
+    isRecord(item) &&
+    typeof item.id === 'string' &&
+    typeof item.name === 'string' &&
+    typeof item.order === 'number',
+  );
+};
+
 const resolveStorageKey = (options?: StorageOptions): string => options?.storageKey ?? STORAGE_KEY;
+
+const migrateUserData = (data: UserDataStore): UserDataStore => {
+  if (data.version < 2) {
+    return {
+      ...data,
+      version: 2,
+      categories: data.categories ?? [],
+      serverCategories: data.serverCategories ?? {},
+    };
+  }
+  return data;
+};
 
 export const loadUserData = (options?: StorageOptions): UserDataStore => {
   try {
@@ -70,14 +102,16 @@ export const loadUserData = (options?: StorageOptions): UserDataStore => {
     if (!isRecord(parsed)) {
       return createDefaultUserData();
     }
-    return {
+    return migrateUserData({
       version: typeof parsed.version === 'number' ? parsed.version : 1,
       favorites: toStringArray(parsed.favorites),
       nicknames: toStringRecord(parsed.nicknames),
       notes: toStringRecord(parsed.notes),
       widgetCache: toWidgetCache(parsed.widgetCache),
       lastFetchTimestamp: typeof parsed.lastFetchTimestamp === 'string' ? parsed.lastFetchTimestamp : null,
-    };
+      categories: toCategoryDefinitions(parsed.categories),
+      serverCategories: toStringRecord(parsed.serverCategories),
+    });
   } catch (error) {
     console.error('Failed to load user data', error);
     return createDefaultUserData();
@@ -184,6 +218,7 @@ const isValidUserData = (value: unknown): value is UserDataStore => {
   if (!isRecord(value.widgetCache)) return false;
   // lastFetchTimestamp is optional for backwards compatibility
   if (value.lastFetchTimestamp !== undefined && value.lastFetchTimestamp !== null && typeof value.lastFetchTimestamp !== 'string') return false;
+  // categories and serverCategories are optional (v1 compat)
   return true;
 };
 
@@ -192,14 +227,108 @@ export const importUserData = (raw: unknown, options?: StorageOptions): UserData
     throw new Error('Invalid user data format');
   }
 
-  const sanitized: UserDataStore = {
+  const sanitized: UserDataStore = migrateUserData({
     version: raw.version,
     favorites: toStringArray(raw.favorites),
     nicknames: toStringRecord(raw.nicknames),
     notes: toStringRecord(raw.notes),
     widgetCache: toWidgetCache(raw.widgetCache),
     lastFetchTimestamp: typeof raw.lastFetchTimestamp === 'string' ? raw.lastFetchTimestamp : null,
-  };
+    categories: toCategoryDefinitions((raw as unknown as Record<string, unknown>).categories),
+    serverCategories: toStringRecord((raw as unknown as Record<string, unknown>).serverCategories),
+  });
   saveUserData(sanitized, options);
   return sanitized;
+};
+
+export const addCategory = (
+  data: UserDataStore,
+  name: string,
+  options?: StorageOptions,
+): UserDataStore => {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return data;
+  const maxOrder = data.categories.reduce((max, cat) => Math.max(max, cat.order), -1);
+  const newCategory: CategoryDefinition = {
+    id: crypto.randomUUID(),
+    name: trimmed,
+    order: maxOrder + 1,
+  };
+  const next = { ...data, categories: [...data.categories, newCategory] };
+  saveUserData(next, options);
+  return next;
+};
+
+export const updateCategory = (
+  data: UserDataStore,
+  categoryId: string,
+  name: string,
+  options?: StorageOptions,
+): UserDataStore => {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) return data;
+  const categories = data.categories.map((cat) =>
+    cat.id === categoryId ? { ...cat, name: trimmed } : cat,
+  );
+  const next = { ...data, categories };
+  saveUserData(next, options);
+  return next;
+};
+
+export const deleteCategory = (
+  data: UserDataStore,
+  categoryId: string,
+  options?: StorageOptions,
+): UserDataStore => {
+  const categories = data.categories.filter((cat) => cat.id !== categoryId);
+  const serverCategories = { ...data.serverCategories };
+  for (const [guildId, catId] of Object.entries(serverCategories)) {
+    if (catId === categoryId) {
+      delete serverCategories[guildId];
+    }
+  }
+  const next = { ...data, categories, serverCategories };
+  saveUserData(next, options);
+  return next;
+};
+
+export const moveCategory = (
+  data: UserDataStore,
+  categoryId: string,
+  direction: 'up' | 'down',
+  options?: StorageOptions,
+): UserDataStore => {
+  const sorted = [...data.categories].sort((a, b) => a.order - b.order);
+  const index = sorted.findIndex((cat) => cat.id === categoryId);
+  if (index < 0) return data;
+  const targetIndex = direction === 'up' ? index - 1 : index + 1;
+  if (targetIndex < 0 || targetIndex >= sorted.length) return data;
+
+  const current = sorted[index];
+  const target = sorted[targetIndex];
+  const categories = data.categories.map((cat) => {
+    if (cat.id === current.id) return { ...cat, order: target.order };
+    if (cat.id === target.id) return { ...cat, order: current.order };
+    return cat;
+  });
+  const next = { ...data, categories };
+  saveUserData(next, options);
+  return next;
+};
+
+export const assignServerToCategory = (
+  data: UserDataStore,
+  guildId: string,
+  categoryId: string | null,
+  options?: StorageOptions,
+): UserDataStore => {
+  const serverCategories = { ...data.serverCategories };
+  if (categoryId === null) {
+    delete serverCategories[guildId];
+  } else {
+    serverCategories[guildId] = categoryId;
+  }
+  const next = { ...data, serverCategories };
+  saveUserData(next, options);
+  return next;
 };

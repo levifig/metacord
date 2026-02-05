@@ -137,6 +137,13 @@
                   Download user_data.json
                 </span>
               </div>
+              <button
+                class="btn btn-secondary"
+                id="btn-categories"
+                type="button"
+              >
+                Manage categories
+              </button>
               <div class="fetch-container" id="fetch-container">
                 <div class="fetch-actions">
                   <div class="tooltip-anchor" id="fetch-tooltip-anchor">
@@ -276,6 +283,8 @@
               ></div>
             </div>
           </section>
+
+          <div id="category-sections-container"></div>
 
           <section class="section hidden" id="owned-section">
             <button
@@ -632,6 +641,49 @@
           </div>
           <p class="muted">This will download <code>guilds_api.json</code> with your server list.</p>
 
+          <div class="modal-actions">
+            <button class="btn btn-secondary" type="button" data-modal-close>
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="categories-modal" aria-hidden="true">
+      <div
+        class="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="categories-title"
+      >
+        <header class="modal-header">
+          <h3 id="categories-title">Manage categories</h3>
+          <button
+            class="icon-button"
+            type="button"
+            data-modal-close
+            aria-label="Close"
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </header>
+        <div class="modal-body">
+          <p>Create custom categories to organize your servers.</p>
+          <div class="category-add-row">
+            <input
+              type="text"
+              id="category-name-input"
+              class="search-input"
+              placeholder="New category name"
+              autocomplete="off"
+              aria-label="New category name"
+            />
+            <button class="btn btn-primary btn-sm" id="btn-add-category" type="button">
+              Add
+            </button>
+          </div>
+          <div id="categories-list" class="categories-list" role="list" aria-label="Categories"></div>
           <div class="modal-actions">
             <button class="btn btn-secondary" type="button" data-modal-close>
               Close

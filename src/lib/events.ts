@@ -1,5 +1,13 @@
 import { logout } from './api';
-import { importUserData, exportUserData, toggleFavorite } from './storage';
+import {
+  importUserData,
+  exportUserData,
+  toggleFavorite,
+  addCategory,
+  updateCategory,
+  deleteCategory,
+  moveCategory,
+} from './storage';
 import { createElement } from './utils';
 import type { ModalController } from '../components/modal';
 import {
@@ -316,10 +324,11 @@ export interface SetupEventsOptions {
   fetchModal: ModalController;
   instructionsModal: ModalController;
   demoModal: ModalController;
+  categoriesModal: ModalController;
 }
 
 export const setupEvents = (options: SetupEventsOptions): void => {
-  const { importModal, fetchModal, instructionsModal, demoModal } = options;
+  const { importModal, fetchModal, instructionsModal, demoModal, categoriesModal } = options;
 
   const searchInput = getElement<HTMLInputElement>('search-input');
   const fetchButton = getElement<HTMLButtonElement>('btn-fetch');
@@ -493,6 +502,99 @@ export const setupEvents = (options: SetupEventsOptions): void => {
     fetchState.shouldStop = true;
   });
   fetchForce.addEventListener('change', updateFetchSkipInfo);
+
+  // --- Categories management ---
+  const categoriesButton = getElement<HTMLButtonElement>('btn-categories');
+  const categoryNameInput = getElement<HTMLInputElement>('category-name-input');
+  const addCategoryButton = getElement<HTMLButtonElement>('btn-add-category');
+
+  const renderCategoriesList = (): void => {
+    const list = getElement<HTMLElement>('categories-list');
+    list.replaceChildren();
+    const sorted = [...state.userData.categories].sort((a, b) => a.order - b.order);
+    if (sorted.length === 0) {
+      const empty = createElement('p', 'muted', 'No categories yet. Add one above.');
+      list.appendChild(empty);
+      return;
+    }
+    sorted.forEach((cat, index) => {
+      const item = createElement('div', 'category-item');
+      item.setAttribute('role', 'listitem');
+      const nameSpan = createElement('span', 'category-item-name', cat.name);
+      const actionsRow = createElement('div', 'category-item-actions');
+
+      const upBtn = createElement('button', 'btn btn-ghost btn-sm', '\u2191');
+      upBtn.type = 'button';
+      upBtn.setAttribute('aria-label', `Move ${cat.name} up`);
+      upBtn.disabled = index === 0;
+      upBtn.addEventListener('click', () => {
+        state.userData = moveCategory(state.userData, cat.id, 'up', storageOptions);
+        renderCategoriesList();
+        render();
+      });
+
+      const downBtn = createElement('button', 'btn btn-ghost btn-sm', '\u2193');
+      downBtn.type = 'button';
+      downBtn.setAttribute('aria-label', `Move ${cat.name} down`);
+      downBtn.disabled = index === sorted.length - 1;
+      downBtn.addEventListener('click', () => {
+        state.userData = moveCategory(state.userData, cat.id, 'down', storageOptions);
+        renderCategoriesList();
+        render();
+      });
+
+      const renameBtn = createElement('button', 'btn btn-secondary btn-sm', 'Rename');
+      renameBtn.type = 'button';
+      renameBtn.setAttribute('aria-label', `Rename ${cat.name}`);
+      renameBtn.addEventListener('click', () => {
+        const newName = prompt('Rename category:', cat.name);
+        if (newName !== null && newName.trim().length > 0) {
+          state.userData = updateCategory(state.userData, cat.id, newName, storageOptions);
+          renderCategoriesList();
+          render();
+          showToast('Category renamed');
+        }
+      });
+
+      const deleteBtn = createElement('button', 'btn btn-danger btn-sm', 'Delete');
+      deleteBtn.type = 'button';
+      deleteBtn.setAttribute('aria-label', `Delete ${cat.name}`);
+      deleteBtn.addEventListener('click', () => {
+        if (confirm(`Delete category "${cat.name}"? Servers in it will be uncategorized.`)) {
+          state.userData = deleteCategory(state.userData, cat.id, storageOptions);
+          renderCategoriesList();
+          render();
+          showToast('Category deleted');
+        }
+      });
+
+      actionsRow.append(upBtn, downBtn, renameBtn, deleteBtn);
+      item.append(nameSpan, actionsRow);
+      list.appendChild(item);
+    });
+  };
+
+  categoriesButton.addEventListener('click', (event) => {
+    renderCategoriesList();
+    categoriesModal.open(event.currentTarget as HTMLElement);
+  });
+
+  addCategoryButton.addEventListener('click', () => {
+    const name = categoryNameInput.value.trim();
+    if (name.length === 0) return;
+    state.userData = addCategory(state.userData, name, storageOptions);
+    categoryNameInput.value = '';
+    renderCategoriesList();
+    render();
+    showToast(`Category "${name}" created`);
+  });
+
+  categoryNameInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      addCategoryButton.click();
+    }
+  });
 
   // --- Selection mode ---
   const selectToggle = document.getElementById('btn-select-toggle');

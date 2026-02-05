@@ -24,6 +24,7 @@ import {
   isDemoMode,
   registerDynamicSection,
   clearDynamicSections,
+  saveCollapsedSections,
   state,
   storageOptions,
 } from './state';
@@ -247,6 +248,60 @@ const renderSection = (key: string, servers: ServerView[]): void => {
   });
 };
 
+// --- Dynamic category section creation ---
+
+const createCategorySectionDOM = (categoryId: string, categoryName: string): SectionElements => {
+  const sectionKey = `category-${categoryId}`;
+  const section = createElement('section', 'section hidden');
+  section.id = `${sectionKey}-section`;
+
+  const header = document.createElement('button');
+  header.className = 'section-header';
+  header.type = 'button';
+  header.dataset.collapseToggle = sectionKey;
+  const isCollapsed = collapsedSections.has(sectionKey);
+  header.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+  header.setAttribute('aria-controls', `${sectionKey}-content`);
+
+  const headerLeft = createElement('div', 'section-header-left');
+  const chevron = createElement('span', 'section-chevron');
+  chevron.setAttribute('aria-hidden', 'true');
+  chevron.innerHTML = '&#9662;';
+  const h2 = createElement('h2', '', categoryName);
+  headerLeft.append(chevron, h2);
+
+  const countPill = createElement('span', 'count-pill');
+  countPill.id = `${sectionKey}-count`;
+  countPill.textContent = '0';
+
+  header.append(headerLeft, countPill);
+  header.addEventListener('click', () => {
+    const expanded = header.getAttribute('aria-expanded') === 'true';
+    header.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    content.classList.toggle('is-collapsed', expanded);
+    if (expanded) {
+      collapsedSections.add(sectionKey);
+    } else {
+      collapsedSections.delete(sectionKey);
+    }
+    saveCollapsedSections(collapsedSections);
+  });
+
+  const content = createElement('div', 'section-content');
+  content.id = `${sectionKey}-content`;
+  if (isCollapsed) {
+    content.classList.add('is-collapsed');
+  }
+
+  const list = createElement('div', 'server-grid server-grid--constrained');
+  list.id = `${sectionKey}-list`;
+  content.appendChild(list);
+
+  section.append(header, content);
+
+  return { section, list, count: countPill, content, header };
+};
+
 // --- Main render ---
 
 export const render = (): void => {
@@ -257,13 +312,43 @@ export const render = (): void => {
 
   const comparator = getSortComparator(state.sort);
   const favorites = filtered.filter((server) => server.isFavorite).sort(comparator);
-  const owned = filtered.filter((server) => server.owner && !server.isFavorite).sort(comparator);
-  const publicServers = filtered
-    .filter((server) => !server.owner && !server.isFavorite && Boolean(server.widget?.instantInvite))
-    .sort(comparator);
-  const privateServers = filtered
-    .filter((server) => !server.owner && !server.isFavorite && !server.widget?.instantInvite)
-    .sort(comparator);
+
+  // Build set of servers in custom categories (excluding favorites — favorites take priority)
+  const categorizedIds = new Set<string>();
+  const sortedCategories = [...state.userData.categories].sort((a, b) => a.order - b.order);
+
+  // Remove old dynamic category sections from DOM and state registry
+  const categoryContainer = document.getElementById('category-sections-container');
+  if (categoryContainer) {
+    categoryContainer.replaceChildren();
+  }
+  clearDynamicSections();
+
+  // Render each category section
+  for (const category of sortedCategories) {
+    const sectionKey = `category-${category.id}`;
+    const categoryServers = filtered.filter((server) => {
+      if (server.isFavorite) return false;
+      return state.userData.serverCategories[server.id] === category.id;
+    }).sort(comparator);
+
+    categoryServers.forEach((s) => categorizedIds.add(s.id));
+
+    const elements = createCategorySectionDOM(category.id, category.name);
+    registerDynamicSection(sectionKey, elements);
+    categoryContainer?.appendChild(elements.section);
+    renderSection(sectionKey, categoryServers);
+  }
+
+  const owned = filtered.filter((server) =>
+    server.owner && !server.isFavorite && !categorizedIds.has(server.id),
+  ).sort(comparator);
+  const publicServers = filtered.filter((server) =>
+    !server.owner && !server.isFavorite && !categorizedIds.has(server.id) && Boolean(server.widget?.instantInvite),
+  ).sort(comparator);
+  const privateServers = filtered.filter((server) =>
+    !server.owner && !server.isFavorite && !categorizedIds.has(server.id) && !server.widget?.instantInvite,
+  ).sort(comparator);
 
   renderSection('favorites', favorites);
   renderSection('owned', owned);
@@ -446,12 +531,38 @@ export const openDetails = async (guildId: string): Promise<void> => {
   notesField.append(notesLabel, notesInput);
   detailsBody.appendChild(notesField);
 
+  // Category assignment dropdown
+  const categoryField = createElement('div', 'form-field');
+  const categoryLabel = createElement('label', '', 'Category');
+  categoryLabel.setAttribute('for', 'category-select');
+  const categorySelect = document.createElement('select');
+  categorySelect.id = 'category-select';
+  categorySelect.className = 'sort-select';
+
+  const noneOption = document.createElement('option');
+  noneOption.value = '';
+  noneOption.textContent = 'None';
+  categorySelect.appendChild(noneOption);
+
+  const sortedCats = [...state.userData.categories].sort((a, b) => a.order - b.order);
+  for (const cat of sortedCats) {
+    const opt = document.createElement('option');
+    opt.value = cat.id;
+    opt.textContent = cat.name;
+    categorySelect.appendChild(opt);
+  }
+  categorySelect.value = state.userData.serverCategories[guildId] ?? '';
+  categoryField.append(categoryLabel, categorySelect);
+  detailsBody.appendChild(categoryField);
+
   const actions = createElement('div', 'modal-actions');
   const saveButton = createElement('button', 'btn btn-primary', 'Save');
   saveButton.type = 'button';
   saveButton.addEventListener('click', () => {
     state.userData = updateNickname(state.userData, guildId, nicknameInput.value, storageOptions);
     state.userData = updateNotes(state.userData, guildId, notesInput.value, storageOptions);
+    const selectedCategory = categorySelect.value || null;
+    state.userData = assignServerToCategory(state.userData, guildId, selectedCategory, storageOptions);
     showToast('Details saved');
     render();
     _detailsModal?.close();
