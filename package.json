@@ -6,12 +6,12 @@
   "scripts": {
     "dev": "concurrently -k \"pnpm run dev:ui\" \"pnpm run dev:api\"",
     "dev:ui": "vite",
-    "dev:api": "wrangler dev --env development",
+    "dev:api": "wrangler dev",
     "build": "vite build",
-    "preview": "pnpm run build && wrangler dev --env development",
+    "preview": "pnpm run build && wrangler dev",
     "deploy": "pnpm run build && wrangler deploy --env=production",
     "deploy:prod": "pnpm run build && wrangler deploy --env=production",
-    "deploy:dev": "pnpm run build && wrangler deploy --env=development",
+    "deploy:dev": "pnpm run build && wrangler deploy",
     "test": "vitest run",
     "test:watch": "vitest",
     "types": "wrangler types"
