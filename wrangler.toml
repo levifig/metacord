@@ -39,7 +39,7 @@ name = "DISCORD_RATE_LIMITER"
 class_name = "DiscordRateLimiter"
 
 [env.production.vars]
-DISCORD_CLIENT_ID = "1463316345633374269"
+DISCORD_CLIENT_ID = "1463314254664040501"
 DISCORD_REDIRECT_URI = "https://metacord.app/api/auth/callback"
 
 [env.development]
